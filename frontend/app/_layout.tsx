@@ -1,9 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import { Audio } from 'expo-av';
 
 export default function TabLayout() {
+  // CRITICAL: Configure audio to work in iOS Silent Mode
+  useEffect(() => {
+    const setupAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          allowsRecordingIOS: true,
+          staysActiveInBackground: false,
+        });
+        console.log('Audio configured for iOS silent mode');
+      } catch (error) {
+        console.error('Failed to configure audio:', error);
+      }
+    };
+    
+    setupAudio();
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
