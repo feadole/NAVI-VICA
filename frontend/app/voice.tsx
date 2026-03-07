@@ -14,11 +14,48 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+// Cross-platform speech function
+const speak = (text: string, rate: number = 0.9) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+    console.log('Speaking:', text);
+  } else {
+    import('expo-speech').then(Speech => {
+      Speech.speak(text, { rate, pitch: 1.0 });
+    });
+  }
+};
+
+const stopSpeaking = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  } else {
+    import('expo-speech').then(Speech => {
+      Speech.stop();
+    });
+  }
+};
+
+// Web Speech Recognition for voice input
+let recognition: any = null;
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+  }
+}
 
 interface Message {
   id: string;
@@ -37,103 +74,77 @@ export default function VoiceScreen() {
     {
       id: '1',
       type: 'assistant',
-      text: "Hello! I'm NAVI-VICA, your personal navigator. Upload a photo and I'll guide you, or speak to me — I'm listening!",
+      text: "Hello! I'm NAVI-VICA, your personal navigator. Type a command or tap the microphone to speak.",
       timestamp: new Date(),
     },
   ]);
   const [lastResponse, setLastResponse] = useState('');
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    requestAudioPermissions();
-    // Speak welcome message
-    speakText("Hello! I'm NAVI-VICA, your personal navigator. How can I help you today?");
+    // Check if voice recognition is supported
+    if (Platform.OS === 'web' && recognition) {
+      setVoiceSupported(true);
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('Voice recognized:', transcript);
+        setInputText(transcript);
+        setIsListening(false);
+        // Automatically process the command
+        processCommand(transcript);
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        speak('Sorry, I could not hear you. Please try again or type your command.');
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+    }
     
-    return () => {
-      if (recording) {
-        recording.stopAndUnloadAsync();
-      }
-    };
+    // Welcome message
+    setTimeout(() => {
+      speak("Hello! I'm NAVI-VICA, your personal navigator. How can I help you today?");
+    }, 500);
   }, []);
 
-  const speakText = (text: string) => {
-    setIsSpeaking(true);
-    Speech.speak(text, {
-      rate: 0.9,
-      pitch: 1.0,
-      onDone: () => setIsSpeaking(false),
-      onStopped: () => setIsSpeaking(false),
-      onError: () => setIsSpeaking(false),
-    });
-  };
-
-  const requestAudioPermissions = async () => {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status === 'granted') {
-        setPermissionGranted(true);
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-      } else {
-        Alert.alert(
-          'Permission Required',
-          'Microphone permission is needed for voice commands. Please enable it in settings.',
-          [{ text: 'OK' }]
-        );
+  const startListening = () => {
+    if (Platform.OS === 'web' && recognition) {
+      try {
+        setIsListening(true);
+        speak('Listening. Speak now.');
+        setTimeout(() => {
+          recognition.start();
+        }, 1500);
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+        setIsListening(false);
+        speak('Voice recognition failed. Please type your command.');
       }
-    } catch (error) {
-      console.error('Error requesting audio permissions:', error);
+    } else {
+      speak('Voice input is not supported on this device. Please type your command.');
     }
   };
 
-  const startListening = async () => {
-    if (!permissionGranted) {
-      await requestAudioPermissions();
-      return;
-    }
-
-    try {
-      setIsListening(true);
-      speakText('I am listening. Speak now.');
-      
-      // Small delay to let the speech finish
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(newRecording);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      setIsListening(false);
-      speakText('Sorry, I could not start listening. Please try typing your command.');
-    }
-  };
-
-  const stopListening = async () => {
-    try {
-      setIsListening(false);
-      
-      if (recording) {
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
-        setRecording(null);
-        
-        // Since we don't have speech-to-text API, prompt user to type
-        speakText('Recording stopped. Please type your command in the text box below, or try the quick command buttons.');
+  const stopListening = () => {
+    if (Platform.OS === 'web' && recognition) {
+      try {
+        recognition.stop();
+      } catch (error) {
+        console.error('Failed to stop recognition:', error);
       }
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
     }
+    setIsListening(false);
   };
 
   const processCommand = async (text: string) => {
     if (!text.trim()) {
-      speakText('Please enter a command.');
+      speak('Please enter a command.');
       return;
     }
 
@@ -147,9 +158,6 @@ export default function VoiceScreen() {
     setInputText('');
     Keyboard.dismiss();
     setIsProcessing(true);
-    
-    // Speak that we're processing
-    speakText('Processing your command.');
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/process-voice`, {
@@ -179,22 +187,24 @@ export default function VoiceScreen() {
       setLastResponse(result.response_text);
 
       // ALWAYS speak the response
-      speakText(result.response_text);
+      setIsSpeaking(true);
+      speak(result.response_text);
+      setTimeout(() => setIsSpeaking(false), 8000);
 
       // Handle actions
       if (result.action) {
         setTimeout(() => {
           switch (result.action) {
             case 'open_camera':
-              speakText('Opening camera for scene analysis.');
+              speak('Opening camera for scene analysis.');
               router.push('/camera');
               break;
             case 'open_meds':
-              speakText('Opening medication reminders.');
+              speak('Opening medication reminders.');
               router.push('/meds');
               break;
             case 'open_settings':
-              speakText('Opening settings.');
+              speak('Opening settings.');
               router.push('/settings');
               break;
           }
@@ -209,7 +219,7 @@ export default function VoiceScreen() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
-      speakText("I'm sorry, I couldn't process that command. Please try again.");
+      speak("I'm sorry, I couldn't process that command. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -217,15 +227,12 @@ export default function VoiceScreen() {
 
   const speakLastResponse = () => {
     if (lastResponse) {
-      speakText(lastResponse);
+      setIsSpeaking(true);
+      speak(lastResponse);
+      setTimeout(() => setIsSpeaking(false), 8000);
     } else {
-      speakText('No previous response to play.');
+      speak('No previous response to play.');
     }
-  };
-
-  const stopSpeaking = () => {
-    Speech.stop();
-    setIsSpeaking(false);
   };
 
   const quickCommands = [
@@ -247,6 +254,17 @@ export default function VoiceScreen() {
           <View style={styles.speakingIndicator}>
             <Ionicons name="volume-high" size={20} color="#00D9FF" />
             <Text style={styles.speakingText}>NAVI-VICA is speaking...</Text>
+            <TouchableOpacity onPress={stopSpeaking} style={styles.stopButton}>
+              <Text style={styles.stopButtonText}>STOP</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Listening Indicator */}
+        {isListening && (
+          <View style={styles.listeningIndicator}>
+            <Ionicons name="mic" size={20} color="#F44336" />
+            <Text style={styles.listeningText}>Listening... Speak now!</Text>
           </View>
         )}
 
@@ -312,6 +330,7 @@ export default function VoiceScreen() {
         )}
 
         {/* Quick Commands */}
+        <Text style={styles.quickLabel}>Quick Commands:</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -336,8 +355,7 @@ export default function VoiceScreen() {
               styles.voiceButton,
               isListening && styles.voiceButtonActive,
             ]}
-            onPressIn={startListening}
-            onPressOut={stopListening}
+            onPress={isListening ? stopListening : startListening}
           >
             <Ionicons
               name={isListening ? 'radio' : 'mic'}
@@ -346,10 +364,10 @@ export default function VoiceScreen() {
             />
           </TouchableOpacity>
           <Text style={styles.voiceHint}>
-            {isListening ? 'Release to stop' : 'Hold to speak'}
+            {isListening ? 'Tap to stop' : 'Tap to speak'}
           </Text>
-          {!permissionGranted && (
-            <Text style={styles.permissionWarning}>Microphone permission required</Text>
+          {!voiceSupported && Platform.OS === 'web' && (
+            <Text style={styles.voiceWarning}>Voice not supported in this browser</Text>
           )}
         </View>
 
@@ -397,6 +415,31 @@ const styles = StyleSheet.create({
   },
   speakingText: {
     color: '#00D9FF',
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  stopButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  stopButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  listeningIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3a1a1e',
+    padding: 10,
+  },
+  listeningText: {
+    color: '#F44336',
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
@@ -478,6 +521,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  quickLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginLeft: 16,
+    marginBottom: 4,
+  },
   quickCommandsContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -521,7 +570,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
   },
-  permissionWarning: {
+  voiceWarning: {
     color: '#F44336',
     fontSize: 11,
     marginTop: 4,

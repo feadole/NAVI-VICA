@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,36 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import * as Speech from 'expo-speech';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+// Cross-platform speech function
+const speak = (text: string, rate: number = 0.9) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+    console.log('Speaking:', text);
+  } else {
+    import('expo-speech').then(Speech => {
+      Speech.speak(text, { rate, pitch: 1.0 });
+    });
+  }
+};
+
+const stopSpeaking = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  } else {
+    import('expo-speech').then(Speech => {
+      Speech.stop();
+    });
+  }
+};
 
 interface Reminder {
   id: string;
@@ -47,22 +72,16 @@ export default function MedsScreen() {
   const [newMinute, setNewMinute] = useState('');
   const [repeatDaily, setRepeatDaily] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [alarmSound, setAlarmSound] = useState<Audio.Sound | null>(null);
   const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
 
   useEffect(() => {
     loadReminders();
     requestNotificationPermissions();
-    loadAlarmSound();
     
     // Speak welcome
-    Speech.speak('Medication reminders screen. You can add new reminders or test the alarm sound.', { rate: 0.9 });
-
-    return () => {
-      if (alarmSound) {
-        alarmSound.unloadAsync();
-      }
-    };
+    setTimeout(() => {
+      speak('Medication reminders screen. You can add new reminders or test the alarm sound.');
+    }, 500);
   }, []);
 
   const requestNotificationPermissions = async () => {
@@ -77,17 +96,6 @@ export default function MedsScreen() {
       }
     } catch (error) {
       console.error('Error requesting notification permissions:', error);
-    }
-  };
-
-  const loadAlarmSound = async () => {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-    } catch (error) {
-      console.error('Error setting audio mode:', error);
     }
   };
 
@@ -125,7 +133,7 @@ export default function MedsScreen() {
 
   const addReminder = async () => {
     if (!newMedName.trim()) {
-      Speech.speak('Please enter a medication name', { rate: 0.9 });
+      speak('Please enter a medication name');
       Alert.alert('Error', 'Please enter a medication name');
       return;
     }
@@ -134,13 +142,13 @@ export default function MedsScreen() {
     const minute = parseInt(newMinute) || 0;
 
     if (hour < 0 || hour > 23) {
-      Speech.speak('Hour must be between 0 and 23', { rate: 0.9 });
+      speak('Hour must be between 0 and 23');
       Alert.alert('Error', 'Hour must be between 0 and 23');
       return;
     }
 
     if (minute < 0 || minute > 59) {
-      Speech.speak('Minute must be between 0 and 59', { rate: 0.9 });
+      speak('Minute must be between 0 and 59');
       Alert.alert('Error', 'Minute must be between 0 and 59');
       return;
     }
@@ -173,16 +181,13 @@ export default function MedsScreen() {
         setRepeatDaily(true);
 
         const timeStr = formatTime(hour, minute);
-        Speech.speak(
-          `Reminder set successfully for ${newReminder.name} at ${timeStr}`,
-          { rate: 0.9 }
-        );
+        speak(`Reminder set successfully for ${newReminder.name} at ${timeStr}`);
       } else {
         throw new Error('Failed to create reminder');
       }
     } catch (error) {
       console.error('Error adding reminder:', error);
-      Speech.speak('Failed to create reminder. Please try again.', { rate: 0.9 });
+      speak('Failed to create reminder. Please try again.');
       Alert.alert('Error', 'Failed to create reminder');
     } finally {
       setIsLoading(false);
@@ -197,7 +202,7 @@ export default function MedsScreen() {
 
       if (response.ok) {
         setReminders((prev) => prev.filter((r) => r.id !== id));
-        Speech.speak(`Reminder for ${name} deleted`, { rate: 0.9 });
+        speak(`Reminder for ${name} deleted`);
       }
     } catch (error) {
       console.error('Error deleting reminder:', error);
@@ -215,10 +220,7 @@ export default function MedsScreen() {
         setReminders((prev) =>
           prev.map((r) => (r.id === id ? { ...r, enabled: result.enabled } : r))
         );
-        Speech.speak(
-          `Reminder for ${name} ${result.enabled ? 'enabled' : 'disabled'}`,
-          { rate: 0.9 }
-        );
+        speak(`Reminder for ${name} ${result.enabled ? 'enabled' : 'disabled'}`);
       }
     } catch (error) {
       console.error('Error toggling reminder:', error);
@@ -228,25 +230,28 @@ export default function MedsScreen() {
   const testAlarm = async () => {
     setIsAlarmPlaying(true);
     
-    // Vibrate pattern: [wait, vibrate, wait, vibrate, ...]
-    Vibration.vibrate([0, 500, 200, 500, 200, 500], false);
+    // Vibrate
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate([0, 500, 200, 500, 200, 500], false);
+    }
     
-    // Speak the alarm message loudly
-    Speech.speak(
-      'ATTENTION! MEDICATION REMINDER! It is time to take your medication. This is your medication alarm.',
-      {
-        rate: 0.85,
-        pitch: 1.1,
-        onDone: () => setIsAlarmPlaying(false),
-        onStopped: () => setIsAlarmPlaying(false),
-        onError: () => setIsAlarmPlaying(false),
-      }
+    // Speak the alarm message loudly and clearly
+    speak(
+      'ATTENTION! MEDICATION REMINDER! It is time to take your medication. This is your medication alarm. Please take your medicine now.',
+      0.85
     );
+    
+    // Auto stop after 10 seconds
+    setTimeout(() => {
+      setIsAlarmPlaying(false);
+    }, 10000);
   };
 
   const stopAlarm = () => {
-    Vibration.cancel();
-    Speech.stop();
+    if (Platform.OS !== 'web') {
+      Vibration.cancel();
+    }
+    stopSpeaking();
     setIsAlarmPlaying(false);
   };
 
@@ -340,7 +345,7 @@ export default function MedsScreen() {
               <Text style={styles.sectionTitle}>Test Alarm</Text>
             </View>
             <Text style={styles.testDescription}>
-              Test the alarm to ensure it's loud and clear. This will vibrate and speak.
+              Test the alarm to ensure it's loud and clear. This will speak the alarm message.
             </Text>
             <TouchableOpacity
               style={[styles.testButton, isAlarmPlaying && styles.testButtonActive]}

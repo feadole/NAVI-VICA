@@ -14,10 +14,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import * as Speech from 'expo-speech';
 import { useLocalSearchParams } from 'expo-router';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+// Cross-platform speech function
+const speak = (text: string, rate: number = 0.9) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+    console.log('Speaking:', text);
+  } else {
+    // Native speech
+    import('expo-speech').then(Speech => {
+      Speech.speak(text, { rate, pitch: 1.0 });
+    });
+  }
+};
 
 interface Detection {
   class_name: string;
@@ -44,12 +61,15 @@ export default function CameraScreen() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [autoMode, setAutoMode] = useState(false);
   const [userProfile, setUserProfile] = useState(params.profile || 'general');
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const autoIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Welcome message
-    Speech.speak('Scene analysis screen. Upload an image or start the camera to analyze your surroundings.', { rate: 0.9 });
+    // Welcome message after a short delay
+    setTimeout(() => {
+      speak('Scene analysis screen. Upload an image or start the camera to analyze your surroundings.');
+    }, 500);
     
     return () => {
       if (autoIntervalRef.current) {
@@ -76,13 +96,9 @@ export default function CameraScreen() {
     };
   }, [autoMode, cameraActive]);
 
-  const speakText = (text: string) => {
-    Speech.speak(text, { rate: 0.9, pitch: 1.0 });
-  };
-
   const pickImage = async () => {
     try {
-      speakText('Opening image picker.');
+      speak('Opening image picker.');
       
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -98,22 +114,22 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      speakText('Failed to pick image. Please try again.');
+      speak('Failed to pick image. Please try again.');
       Alert.alert('Error', 'Failed to pick image');
     }
   };
 
   const startCamera = async () => {
     if (!permission?.granted) {
-      speakText('Requesting camera permission.');
+      speak('Requesting camera permission.');
       const result = await requestPermission();
       if (!result.granted) {
-        speakText('Camera permission is required to scan scenes.');
+        speak('Camera permission is required to scan scenes.');
         Alert.alert('Permission Required', 'Camera permission is needed to scan scenes.');
         return;
       }
     }
-    speakText('Camera started. Tap the scan button to capture and analyze.');
+    speak('Camera started. Tap the scan button to capture and analyze.');
     setCameraActive(true);
     setCapturedImage(null);
     setAnalysisResult(null);
@@ -123,7 +139,7 @@ export default function CameraScreen() {
     if (!cameraRef.current || isAnalyzing) return;
 
     try {
-      speakText('Capturing image.');
+      speak('Capturing image.');
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
         quality: 0.7,
@@ -135,13 +151,13 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Error capturing:', error);
-      speakText('Failed to capture image. Please try again.');
+      speak('Failed to capture image. Please try again.');
     }
   };
 
   const analyzeImage = async (base64: string) => {
     setIsAnalyzing(true);
-    speakText('Analyzing scene with YOLOv9 and AI. Please wait.');
+    speak('Analyzing scene with AI. Please wait.');
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/analyze-scene`, {
@@ -162,7 +178,7 @@ export default function CameraScreen() {
       const result: AnalysisResult = await response.json();
       setAnalysisResult(result);
 
-      // Build comprehensive speech
+      // Build comprehensive speech - THIS IS THE KEY PART
       let speechText = '';
       
       // Announce detections count
@@ -174,7 +190,7 @@ export default function CameraScreen() {
         speechText += 'No specific objects detected. ';
       }
       
-      // AI description
+      // AI description - MOST IMPORTANT
       speechText += result.ai_description + ' ';
       
       // Safety warnings (important!)
@@ -187,10 +203,15 @@ export default function CameraScreen() {
         speechText += 'Navigation tips: ' + result.navigation_hints.slice(0, 2).join('. ');
       }
       
-      speakText(speechText);
+      // SPEAK THE FULL RESULT
+      console.log('Speaking analysis result:', speechText);
+      setIsSpeaking(true);
+      speak(speechText, 0.85);
+      setTimeout(() => setIsSpeaking(false), 10000);
+      
     } catch (error) {
       console.error('Analysis error:', error);
-      speakText('Sorry, I could not analyze the scene. Please check your connection and try again.');
+      speak('Sorry, I could not analyze the scene. Please check your connection and try again.');
       Alert.alert('Analysis Error', 'Could not analyze the scene. Please try again.');
     } finally {
       setIsAnalyzing(false);
@@ -203,9 +224,11 @@ export default function CameraScreen() {
       if (analysisResult.safety_warnings.length > 0) {
         speechText += ' Warning: ' + analysisResult.safety_warnings.join('. ');
       }
-      speakText(speechText);
+      setIsSpeaking(true);
+      speak(speechText);
+      setTimeout(() => setIsSpeaking(false), 8000);
     } else {
-      speakText('No analysis results available. Please analyze an image first.');
+      speak('No analysis results available. Please analyze an image first.');
     }
   };
 
@@ -220,12 +243,20 @@ export default function CameraScreen() {
   const handleProfileChange = (key: string) => {
     setUserProfile(key);
     const profile = profiles.find(p => p.key === key);
-    speakText(`Profile changed to ${profile?.label || key}`);
+    speak(`Profile changed to ${profile?.label || key}`);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Speaking Indicator */}
+        {isSpeaking && (
+          <View style={styles.speakingBanner}>
+            <Ionicons name="volume-high" size={20} color="#00D9FF" />
+            <Text style={styles.speakingText}>NAVI-VICA is speaking...</Text>
+          </View>
+        )}
+
         {/* Profile Selector */}
         <ScrollView
           horizontal
@@ -313,7 +344,7 @@ export default function CameraScreen() {
                 style={styles.controlButton}
                 onPress={() => {
                   setCameraActive(false);
-                  speakText('Camera stopped.');
+                  speak('Camera stopped.');
                 }}
                 accessibilityLabel="Stop camera"
               >
@@ -339,7 +370,7 @@ export default function CameraScreen() {
                 ]}
                 onPress={() => {
                   setAutoMode(!autoMode);
-                  speakText(autoMode ? 'Auto mode disabled.' : 'Auto mode enabled. Capturing every 5 seconds.');
+                  speak(autoMode ? 'Auto mode disabled.' : 'Auto mode enabled. Capturing every 5 seconds.');
                 }}
                 accessibilityLabel={`Auto mode ${autoMode ? 'on' : 'off'}`}
               >
@@ -366,6 +397,12 @@ export default function CameraScreen() {
 
         {analysisResult && (
           <View style={styles.resultsContainer}>
+            {/* Speak Button - Prominent */}
+            <TouchableOpacity style={styles.speakResultButton} onPress={speakResult}>
+              <Ionicons name="volume-high" size={24} color="#fff" />
+              <Text style={styles.speakResultText}>TAP TO HEAR DESCRIPTION</Text>
+            </TouchableOpacity>
+
             {/* Detections */}
             <View style={styles.resultSection}>
               <View style={styles.resultHeader}>
@@ -397,9 +434,6 @@ export default function CameraScreen() {
               <View style={styles.resultHeader}>
                 <Ionicons name="chatbubble" size={20} color="#D900FF" />
                 <Text style={styles.resultTitle}>AI Analysis</Text>
-                <TouchableOpacity onPress={speakResult} style={styles.speakButton} accessibilityLabel="Speak result">
-                  <Ionicons name="volume-high" size={24} color="#00D9FF" />
-                </TouchableOpacity>
               </View>
               <Text style={styles.aiDescription}>{analysisResult.ai_description}</Text>
             </View>
@@ -447,6 +481,19 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  speakingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a3a5e',
+    padding: 12,
+  },
+  speakingText: {
+    color: '#00D9FF',
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
   },
   profileSelector: {
     paddingHorizontal: 16,
@@ -603,6 +650,21 @@ const styles = StyleSheet.create({
   resultsContainer: {
     padding: 16,
   },
+  speakResultButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00D9FF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginBottom: 16,
+  },
+  speakResultText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
   resultSection: {
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
@@ -659,9 +721,6 @@ const styles = StyleSheet.create({
   noDetectionsText: {
     color: '#666',
     fontStyle: 'italic',
-  },
-  speakButton: {
-    padding: 8,
   },
   aiDescription: {
     color: '#ccc',
