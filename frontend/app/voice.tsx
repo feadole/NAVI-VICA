@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -25,81 +26,8 @@ interface Message {
   timestamp: Date;
 }
 
-// Speech synthesis with proper error handling
-const createSpeaker = () => {
-  let isSpeaking = false;
-  let currentUtterance: SpeechSynthesisUtterance | null = null;
-  
-  const speak = (text: string, rate: number = 0.9): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.speechSynthesis) {
-        // Fallback for native
-        import('expo-speech').then(Speech => {
-          Speech.speak(text, { rate, pitch: 1.0, onDone: () => resolve() });
-        }).catch(reject);
-        return;
-      }
-      
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = rate;
-      utterance.pitch = 1.0;
-      utterance.lang = 'en-US';
-      
-      utterance.onstart = () => {
-        isSpeaking = true;
-        console.log('Speech started');
-      };
-      
-      utterance.onend = () => {
-        isSpeaking = false;
-        currentUtterance = null;
-        console.log('Speech ended');
-        resolve();
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('Speech error:', event.error);
-        isSpeaking = false;
-        currentUtterance = null;
-        // Don't reject, just resolve to continue flow
-        resolve();
-      };
-      
-      currentUtterance = utterance;
-      
-      // Wait for voices to be loaded
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        utterance.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-      }
-      
-      window.speechSynthesis.speak(utterance);
-    });
-  };
-  
-  const stop = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    } else {
-      import('expo-speech').then(Speech => Speech.stop());
-    }
-    isSpeaking = false;
-    currentUtterance = null;
-  };
-  
-  const getIsSpeaking = () => isSpeaking;
-  
-  return { speak, stop, getIsSpeaking };
-};
-
-const speaker = createSpeaker();
-
 export default function VoiceScreen() {
   const router = useRouter();
-  const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputText, setInputText] = useState('');
@@ -107,154 +35,58 @@ export default function VoiceScreen() {
     {
       id: '1',
       type: 'assistant',
-      text: "Hello! I'm NAVI-VICA. Type a command or tap the microphone to speak.",
+      text: "Hello! I'm NAVI-VICA. Type your command below or tap a quick command button.",
       timestamp: new Date(),
     },
   ]);
   const [lastResponse, setLastResponse] = useState('');
-  const [voiceSupported, setVoiceSupported] = useState(false);
-  const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const scrollViewRef = useRef<ScrollView>(null);
-  const recognitionRef = useRef<any>(null);
-  const isListeningRef = useRef(false);
 
-  // Initialize speech recognition
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (SpeechRecognition) {
-        setVoiceSupported(true);
-        
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-        recognition.maxAlternatives = 1;
-        
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          console.log('Voice recognized:', transcript);
-          setIsListening(false);
-          isListeningRef.current = false;
-          // Process the command
-          handleVoiceResult(transcript);
-        };
-        
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setIsListening(false);
-          isListeningRef.current = false;
-          
-          if (event.error === 'not-allowed') {
-            setMicPermission('denied');
-            Alert.alert('Microphone Blocked', 'Please allow microphone access in your browser settings.');
-          } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
-            speaker.speak('Sorry, I could not hear you. Please try again.');
-          }
-        };
-        
-        recognition.onend = () => {
-          console.log('Recognition ended');
-          setIsListening(false);
-          isListeningRef.current = false;
-        };
-        
-        recognition.onaudiostart = () => {
-          console.log('Audio capture started');
-        };
-        
-        recognitionRef.current = recognition;
-      }
-      
-      // Load voices
-      window.speechSynthesis?.getVoices();
-      window.speechSynthesis?.addEventListener?.('voiceschanged', () => {
-        window.speechSynthesis.getVoices();
-      });
-    }
-    
-    // Don't auto-speak welcome - wait for user interaction
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {}
-      }
-      speaker.stop();
-    };
+    // Welcome speech after mount
+    setTimeout(() => {
+      speakText("Hello! I'm NAVI-VICA, your personal navigator. How can I help you today?");
+    }, 1000);
   }, []);
 
-  const handleVoiceResult = useCallback((transcript: string) => {
-    if (transcript.trim()) {
-      processCommand(transcript);
-    }
-  }, []);
-
-  const startListening = async () => {
-    if (!recognitionRef.current) {
-      speaker.speak('Voice input is not supported in this browser. Please type your command.');
-      return;
-    }
-    
-    // Stop any ongoing speech first
-    speaker.stop();
-    setIsSpeaking(false);
-    
-    // Small delay to ensure speech is stopped
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
+  const speakText = async (text: string) => {
     try {
-      setIsListening(true);
-      isListeningRef.current = true;
+      // Stop any ongoing speech
+      await Speech.stop();
       
-      // Request microphone permission explicitly
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach(track => track.stop()); // Release immediately
-          setMicPermission('granted');
-        } catch (err: any) {
-          console.error('Mic permission error:', err);
-          setMicPermission('denied');
-          setIsListening(false);
-          isListeningRef.current = false;
-          Alert.alert('Microphone Access Required', 'Please allow microphone access to use voice commands.');
-          return;
-        }
-      }
+      setIsSpeaking(true);
       
-      recognitionRef.current.start();
-      console.log('Recognition started');
-      
-    } catch (error: any) {
-      console.error('Failed to start recognition:', error);
-      setIsListening(false);
-      isListeningRef.current = false;
-      
-      if (error.message?.includes('already started')) {
-        // Already running, stop and restart
-        recognitionRef.current.stop();
-      } else {
-        speaker.speak('Could not start voice recognition. Please type your command.');
-      }
+      Speech.speak(text, {
+        rate: 0.9,
+        pitch: 1.0,
+        language: 'en-US',
+        onDone: () => setIsSpeaking(false),
+        onStopped: () => setIsSpeaking(false),
+        onError: (error) => {
+          console.log('Speech error:', error);
+          setIsSpeaking(false);
+        },
+      });
+    } catch (error) {
+      console.error('Speech error:', error);
+      setIsSpeaking(false);
     }
   };
 
-  const stopListening = () => {
-    if (recognitionRef.current && isListeningRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.error('Stop error:', e);
-      }
+  const stopSpeaking = async () => {
+    try {
+      await Speech.stop();
+      setIsSpeaking(false);
+    } catch (error) {
+      console.error('Stop speech error:', error);
     }
-    setIsListening(false);
-    isListeningRef.current = false;
   };
 
   const processCommand = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      speakText('Please enter a command.');
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -295,9 +127,7 @@ export default function VoiceScreen() {
       setLastResponse(result.response_text);
 
       // Speak the response
-      setIsSpeaking(true);
-      await speaker.speak(result.response_text);
-      setIsSpeaking(false);
+      await speakText(result.response_text);
 
       // Handle navigation actions
       if (result.action) {
@@ -313,7 +143,7 @@ export default function VoiceScreen() {
               router.push('/settings');
               break;
           }
-        }, 1000);
+        }, 2000);
       }
     } catch (error) {
       console.error('Error processing command:', error);
@@ -324,19 +154,17 @@ export default function VoiceScreen() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
-      setIsSpeaking(true);
-      await speaker.speak("I'm sorry, I couldn't process that. Please try again.");
-      setIsSpeaking(false);
+      speakText("I'm sorry, I couldn't process that. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const speakLastResponse = async () => {
+  const speakLastResponse = () => {
     if (lastResponse) {
-      setIsSpeaking(true);
-      await speaker.speak(lastResponse);
-      setIsSpeaking(false);
+      speakText(lastResponse);
+    } else {
+      speakText('No previous response to play.');
     }
   };
 
@@ -354,21 +182,14 @@ export default function VoiceScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={100}
       >
-        {/* Status Indicators */}
+        {/* Speaking Indicator */}
         {isSpeaking && (
           <View style={styles.statusBanner}>
             <Ionicons name="volume-high" size={20} color="#00D9FF" />
             <Text style={styles.statusText}>Speaking...</Text>
-            <TouchableOpacity onPress={() => { speaker.stop(); setIsSpeaking(false); }} style={styles.stopBtn}>
+            <TouchableOpacity onPress={stopSpeaking} style={styles.stopBtn}>
               <Text style={styles.stopBtnText}>STOP</Text>
             </TouchableOpacity>
-          </View>
-        )}
-        
-        {isListening && (
-          <View style={[styles.statusBanner, styles.listeningBanner]}>
-            <Ionicons name="mic" size={20} color="#F44336" />
-            <Text style={[styles.statusText, { color: '#F44336' }]}>Listening... Speak now!</Text>
           </View>
         )}
 
@@ -406,64 +227,45 @@ export default function VoiceScreen() {
         {/* Last Response Player */}
         {lastResponse && (
           <TouchableOpacity style={styles.responsePlayer} onPress={speakLastResponse}>
-            <Ionicons name="play-circle" size={24} color="#00D9FF" />
+            <Ionicons name="play-circle" size={28} color="#00D9FF" />
             <Text style={styles.responsePlayerText} numberOfLines={1}>{lastResponse}</Text>
+            <Text style={styles.tapToPlay}>TAP TO PLAY</Text>
           </TouchableOpacity>
         )}
 
         {/* Quick Commands */}
-        <Text style={styles.quickLabel}>Quick Commands:</Text>
+        <Text style={styles.quickLabel}>Quick Commands (tap to send):</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickScroll}>
           {quickCommands.map((cmd, i) => (
             <TouchableOpacity key={i} style={styles.quickBtn} onPress={() => processCommand(cmd.text)}>
-              <Ionicons name={cmd.icon as any} size={16} color="#00D9FF" />
+              <Ionicons name={cmd.icon as any} size={20} color="#00D9FF" />
               <Text style={styles.quickBtnText}>{cmd.text}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Voice Button */}
-        <View style={styles.voiceSection}>
-          <TouchableOpacity
-            style={[styles.voiceBtn, isListening && styles.voiceBtnActive]}
-            onPress={isListening ? stopListening : startListening}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isListening ? 'radio' : 'mic'}
-              size={48}
-              color={isListening ? '#fff' : '#00D9FF'}
+        {/* Text Input - Primary Input Method */}
+        <View style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Type your command:</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g., Describe what's around me"
+              placeholderTextColor="#666"
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={() => processCommand(inputText)}
+              returnKeyType="send"
+              multiline={false}
             />
-          </TouchableOpacity>
-          <Text style={styles.voiceHint}>
-            {isListening ? 'Tap to stop' : 'Tap to speak'}
-          </Text>
-          {!voiceSupported && (
-            <Text style={styles.voiceWarning}>Voice not supported - use text input</Text>
-          )}
-          {micPermission === 'denied' && (
-            <Text style={styles.voiceWarning}>Microphone blocked - check browser settings</Text>
-          )}
-        </View>
-
-        {/* Text Input */}
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type your command..."
-            placeholderTextColor="#666"
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={() => processCommand(inputText)}
-            returnKeyType="send"
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-            onPress={() => processCommand(inputText)}
-            disabled={!inputText.trim()}
-          >
-            <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+              onPress={() => processCommand(inputText)}
+              disabled={!inputText.trim()}
+            >
+              <Ionicons name="send" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -478,11 +280,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1a3a5e',
-    padding: 10,
+    padding: 12,
   },
-  listeningBanner: { backgroundColor: '#3a1a1e' },
   statusText: { color: '#00D9FF', marginLeft: 8, fontSize: 14, fontWeight: '600', flex: 1 },
-  stopBtn: { backgroundColor: '#F44336', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+  stopBtn: { backgroundColor: '#F44336', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
   stopBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   messagesArea: { flex: 1 },
   messagesContent: { padding: 16 },
@@ -497,52 +298,43 @@ const styles = StyleSheet.create({
   responsePlayer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#1a3a5e',
     marginHorizontal: 16,
-    padding: 12,
+    padding: 14,
     borderRadius: 12,
     marginBottom: 8,
   },
-  responsePlayerText: { flex: 1, color: '#888', fontSize: 13, marginLeft: 12 },
-  quickLabel: { color: '#888', fontSize: 12, marginLeft: 16, marginBottom: 4 },
-  quickScroll: { paddingHorizontal: 16, paddingVertical: 8 },
+  responsePlayerText: { flex: 1, color: '#fff', fontSize: 13, marginLeft: 12 },
+  tapToPlay: { color: '#00D9FF', fontSize: 11, fontWeight: '600' },
+  quickLabel: { color: '#00D9FF', fontSize: 13, marginLeft: 16, marginBottom: 8, fontWeight: '600' },
+  quickScroll: { paddingHorizontal: 16, marginBottom: 12 },
   quickBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1a1a2e',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: '#2a2a4e',
+    borderColor: '#00D9FF33',
   },
-  quickBtnText: { color: '#ccc', fontSize: 13, marginLeft: 8 },
-  voiceSection: { alignItems: 'center', paddingVertical: 16 },
-  voiceBtn: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#00D9FF',
-  },
-  voiceBtnActive: { backgroundColor: '#F44336', borderColor: '#F44336' },
-  voiceHint: { color: '#888', fontSize: 13, marginTop: 8 },
-  voiceWarning: { color: '#F44336', fontSize: 11, marginTop: 4 },
-  inputRow: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 16 },
+  quickBtnText: { color: '#fff', fontSize: 14, marginLeft: 8 },
+  inputSection: { paddingHorizontal: 16, paddingBottom: 16 },
+  inputLabel: { color: '#888', fontSize: 12, marginBottom: 8 },
+  inputRow: { flexDirection: 'row' },
   textInput: {
     flex: 1,
     backgroundColor: '#1a1a2e',
-    borderRadius: 24,
-    paddingHorizontal: 20,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     color: '#fff',
-    fontSize: 15,
+    fontSize: 16,
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#00D9FF33',
   },
-  sendBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#00D9FF', justifyContent: 'center', alignItems: 'center' },
+  sendBtn: { width: 54, height: 54, borderRadius: 12, backgroundColor: '#00D9FF', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#333' },
 });

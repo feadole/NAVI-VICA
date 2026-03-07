@@ -14,27 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as Speech from 'expo-speech';
 import { useLocalSearchParams } from 'expo-router';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-
-// Cross-platform speech function
-const speak = (text: string, rate: number = 0.9) => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.pitch = 1.0;
-    utterance.lang = 'en-US';
-    window.speechSynthesis.speak(utterance);
-    console.log('Speaking:', text);
-  } else {
-    // Native speech
-    import('expo-speech').then(Speech => {
-      Speech.speak(text, { rate, pitch: 1.0 });
-    });
-  }
-};
 
 interface Detection {
   class_name: string;
@@ -66,15 +49,16 @@ export default function CameraScreen() {
   const autoIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Welcome message after a short delay
+    // Welcome message
     setTimeout(() => {
-      speak('Scene analysis screen. Upload an image or start the camera to analyze your surroundings.');
+      speakText('Scene analysis. Upload an image or start the camera.');
     }, 500);
     
     return () => {
       if (autoIntervalRef.current) {
         clearInterval(autoIntervalRef.current);
       }
+      Speech.stop();
     };
   }, []);
 
@@ -96,9 +80,27 @@ export default function CameraScreen() {
     };
   }, [autoMode, cameraActive]);
 
+  const speakText = (text: string, rate: number = 0.9) => {
+    Speech.stop();
+    setIsSpeaking(true);
+    Speech.speak(text, {
+      rate,
+      pitch: 1.0,
+      language: 'en-US',
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false),
+    });
+  };
+
+  const stopSpeaking = () => {
+    Speech.stop();
+    setIsSpeaking(false);
+  };
+
   const pickImage = async () => {
     try {
-      speak('Opening image picker.');
+      speakText('Opening image picker.');
       
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -114,22 +116,22 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      speak('Failed to pick image. Please try again.');
+      speakText('Failed to pick image.');
       Alert.alert('Error', 'Failed to pick image');
     }
   };
 
   const startCamera = async () => {
     if (!permission?.granted) {
-      speak('Requesting camera permission.');
+      speakText('Requesting camera permission.');
       const result = await requestPermission();
       if (!result.granted) {
-        speak('Camera permission is required to scan scenes.');
-        Alert.alert('Permission Required', 'Camera permission is needed to scan scenes.');
+        speakText('Camera permission is required.');
+        Alert.alert('Permission Required', 'Camera permission is needed.');
         return;
       }
     }
-    speak('Camera started. Tap the scan button to capture and analyze.');
+    speakText('Camera started. Tap scan to capture.');
     setCameraActive(true);
     setCapturedImage(null);
     setAnalysisResult(null);
@@ -139,7 +141,7 @@ export default function CameraScreen() {
     if (!cameraRef.current || isAnalyzing) return;
 
     try {
-      speak('Capturing image.');
+      speakText('Capturing.');
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
         quality: 0.7,
@@ -151,13 +153,13 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Error capturing:', error);
-      speak('Failed to capture image. Please try again.');
+      speakText('Capture failed.');
     }
   };
 
   const analyzeImage = async (base64: string) => {
     setIsAnalyzing(true);
-    speak('Analyzing scene with AI. Please wait.');
+    speakText('Analyzing scene. Please wait.');
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/analyze-scene`, {
@@ -178,41 +180,28 @@ export default function CameraScreen() {
       const result: AnalysisResult = await response.json();
       setAnalysisResult(result);
 
-      // Build comprehensive speech - THIS IS THE KEY PART
+      // Build and speak the full result
       let speechText = '';
       
-      // Announce detections count
       if (result.detections.length > 0) {
         speechText += `I detected ${result.detections.length} objects. `;
-        const objectNames = result.detections.slice(0, 5).map(d => d.class_name).join(', ');
-        speechText += `Including: ${objectNames}. `;
-      } else {
-        speechText += 'No specific objects detected. ';
+        const names = result.detections.slice(0, 3).map(d => d.class_name).join(', ');
+        speechText += `Including: ${names}. `;
       }
       
-      // AI description - MOST IMPORTANT
       speechText += result.ai_description + ' ';
       
-      // Safety warnings (important!)
       if (result.safety_warnings.length > 0) {
-        speechText += 'Safety warnings: ' + result.safety_warnings.join('. ') + ' ';
+        speechText += 'Warning: ' + result.safety_warnings.join('. ') + ' ';
       }
       
-      // Navigation hints
-      if (result.navigation_hints.length > 0) {
-        speechText += 'Navigation tips: ' + result.navigation_hints.slice(0, 2).join('. ');
-      }
-      
-      // SPEAK THE FULL RESULT
-      console.log('Speaking analysis result:', speechText);
-      setIsSpeaking(true);
-      speak(speechText, 0.85);
-      setTimeout(() => setIsSpeaking(false), 10000);
+      // Speak the full analysis
+      speakText(speechText, 0.85);
       
     } catch (error) {
       console.error('Analysis error:', error);
-      speak('Sorry, I could not analyze the scene. Please check your connection and try again.');
-      Alert.alert('Analysis Error', 'Could not analyze the scene. Please try again.');
+      speakText('Analysis failed. Please try again.');
+      Alert.alert('Error', 'Could not analyze the scene.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -220,15 +209,13 @@ export default function CameraScreen() {
 
   const speakResult = () => {
     if (analysisResult) {
-      let speechText = analysisResult.ai_description;
+      let text = analysisResult.ai_description;
       if (analysisResult.safety_warnings.length > 0) {
-        speechText += ' Warning: ' + analysisResult.safety_warnings.join('. ');
+        text += ' Warning: ' + analysisResult.safety_warnings.join('. ');
       }
-      setIsSpeaking(true);
-      speak(speechText);
-      setTimeout(() => setIsSpeaking(false), 8000);
+      speakText(text);
     } else {
-      speak('No analysis results available. Please analyze an image first.');
+      speakText('No analysis available.');
     }
   };
 
@@ -240,50 +227,37 @@ export default function CameraScreen() {
     { key: 'health', label: 'Health', icon: 'heart' },
   ];
 
-  const handleProfileChange = (key: string) => {
-    setUserProfile(key);
-    const profile = profiles.find(p => p.key === key);
-    speak(`Profile changed to ${profile?.label || key}`);
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Speaking Indicator */}
+        {/* Speaking Banner */}
         {isSpeaking && (
           <View style={styles.speakingBanner}>
             <Ionicons name="volume-high" size={20} color="#00D9FF" />
-            <Text style={styles.speakingText}>NAVI-VICA is speaking...</Text>
+            <Text style={styles.speakingText}>Speaking...</Text>
+            <TouchableOpacity onPress={stopSpeaking} style={styles.stopBtn}>
+              <Text style={styles.stopBtnText}>STOP</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Profile Selector */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.profileSelector}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileSelector}>
           {profiles.map((profile) => (
             <TouchableOpacity
               key={profile.key}
-              style={[
-                styles.profileButton,
-                userProfile === profile.key && styles.profileButtonActive,
-              ]}
-              onPress={() => handleProfileChange(profile.key)}
-              accessibilityLabel={`${profile.label} profile`}
+              style={[styles.profileButton, userProfile === profile.key && styles.profileButtonActive]}
+              onPress={() => {
+                setUserProfile(profile.key);
+                speakText(`Profile: ${profile.label}`);
+              }}
             >
               <Ionicons
                 name={profile.icon as any}
-                size={20}
+                size={18}
                 color={userProfile === profile.key ? '#00D9FF' : '#888'}
               />
-              <Text
-                style={[
-                  styles.profileButtonText,
-                  userProfile === profile.key && styles.profileButtonTextActive,
-                ]}
-              >
+              <Text style={[styles.profileButtonText, userProfile === profile.key && styles.profileButtonTextActive]}>
                 {profile.label}
               </Text>
             </TouchableOpacity>
@@ -294,176 +268,104 @@ export default function CameraScreen() {
         <View style={styles.cameraContainer}>
           {cameraActive ? (
             <View style={styles.cameraWrapper}>
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing={facing}
-              />
+              <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
               <View style={styles.cameraOverlay}>
-                <View style={styles.cameraStatusBar}>
-                  <View style={styles.cameraLiveIndicator}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveText}>LIVE</Text>
-                  </View>
-                  {autoMode && (
-                    <View style={styles.autoModeIndicator}>
-                      <Ionicons name="refresh" size={16} color="#4CAF50" />
-                      <Text style={styles.autoModeText}>AUTO</Text>
-                    </View>
-                  )}
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LIVE</Text>
                 </View>
               </View>
             </View>
           ) : capturedImage ? (
             <Image source={{ uri: capturedImage }} style={styles.capturedImage} resizeMode="contain" />
           ) : (
-            <TouchableOpacity style={styles.uploadArea} onPress={pickImage} accessibilityLabel="Upload image">
+            <TouchableOpacity style={styles.uploadArea} onPress={pickImage}>
               <Ionicons name="image-outline" size={64} color="#666" />
               <Text style={styles.uploadText}>TAP TO UPLOAD IMAGE</Text>
-              <Text style={styles.uploadSubtext}>JPG, PNG, WEBP supported</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Camera Controls */}
+        {/* Controls */}
         <View style={styles.controlsContainer}>
           {!cameraActive ? (
             <View style={styles.controlsRow}>
-              <TouchableOpacity style={styles.controlButton} onPress={startCamera} accessibilityLabel="Start camera">
-                <Ionicons name="camera" size={28} color="#00D9FF" />
-                <Text style={styles.controlButtonText}>Start Camera</Text>
+              <TouchableOpacity style={styles.controlButton} onPress={startCamera}>
+                <Ionicons name="camera" size={32} color="#00D9FF" />
+                <Text style={styles.controlButtonText}>Camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.controlButton} onPress={pickImage} accessibilityLabel="Upload image">
-                <Ionicons name="images" size={28} color="#00D9FF" />
-                <Text style={styles.controlButtonText}>Upload Image</Text>
+              <TouchableOpacity style={styles.controlButton} onPress={pickImage}>
+                <Ionicons name="images" size={32} color="#00D9FF" />
+                <Text style={styles.controlButtonText}>Upload</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.controlsRow}>
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={() => {
-                  setCameraActive(false);
-                  speak('Camera stopped.');
-                }}
-                accessibilityLabel="Stop camera"
-              >
-                <Ionicons name="close" size={28} color="#F44336" />
+              <TouchableOpacity style={styles.controlButton} onPress={() => { setCameraActive(false); speakText('Camera stopped.'); }}>
+                <Ionicons name="close" size={32} color="#F44336" />
                 <Text style={styles.controlButtonText}>Stop</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.captureButton, isAnalyzing && styles.captureButtonDisabled]}
                 onPress={captureAndAnalyze}
                 disabled={isAnalyzing}
-                accessibilityLabel="Capture and analyze"
               >
                 {isAnalyzing ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color="#fff" size="large" />
                 ) : (
-                  <Ionicons name="scan" size={36} color="#fff" />
+                  <Ionicons name="scan" size={40} color="#fff" />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.controlButton,
-                  autoMode && styles.controlButtonActive,
-                ]}
-                onPress={() => {
-                  setAutoMode(!autoMode);
-                  speak(autoMode ? 'Auto mode disabled.' : 'Auto mode enabled. Capturing every 5 seconds.');
-                }}
-                accessibilityLabel={`Auto mode ${autoMode ? 'on' : 'off'}`}
-              >
-                <Ionicons
-                  name="refresh"
-                  size={28}
-                  color={autoMode ? '#4CAF50' : '#00D9FF'}
-                />
-                <Text style={styles.controlButtonText}>
-                  Auto {autoMode ? 'ON' : 'OFF'}
-                </Text>
+              <TouchableOpacity style={styles.controlButton} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+                <Ionicons name="camera-reverse" size={32} color="#00D9FF" />
+                <Text style={styles.controlButtonText}>Flip</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Analysis Results */}
-        {isAnalyzing && !analysisResult && (
+        {/* Loading */}
+        {isAnalyzing && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#00D9FF" />
-            <Text style={styles.loadingText}>Analyzing with YOLOv9 + Gemini AI...</Text>
+            <Text style={styles.loadingText}>Analyzing with YOLOv9 + AI...</Text>
           </View>
         )}
 
+        {/* Results */}
         {analysisResult && (
           <View style={styles.resultsContainer}>
-            {/* Speak Button - Prominent */}
+            {/* Speak Button */}
             <TouchableOpacity style={styles.speakResultButton} onPress={speakResult}>
-              <Ionicons name="volume-high" size={24} color="#fff" />
+              <Ionicons name="volume-high" size={28} color="#fff" />
               <Text style={styles.speakResultText}>TAP TO HEAR DESCRIPTION</Text>
             </TouchableOpacity>
 
             {/* Detections */}
             <View style={styles.resultSection}>
-              <View style={styles.resultHeader}>
-                <Ionicons name="locate" size={20} color="#00D9FF" />
-                <Text style={styles.resultTitle}>Detection Results</Text>
-                <Text style={styles.detectionCount}>
-                  {analysisResult.detections.length} objects
-                </Text>
+              <Text style={styles.resultTitle}>Detected: {analysisResult.detections.length} objects</Text>
+              <View style={styles.detectionsGrid}>
+                {analysisResult.detections.slice(0, 6).map((det, i) => (
+                  <View key={i} style={styles.detectionChip}>
+                    <Text style={styles.detectionName}>{det.class_name}</Text>
+                    <Text style={styles.detectionInfo}>{Math.round(det.confidence * 100)}% • {det.position}</Text>
+                  </View>
+                ))}
               </View>
-              {analysisResult.detections.length > 0 ? (
-                <View style={styles.detectionsGrid}>
-                  {analysisResult.detections.slice(0, 8).map((det, index) => (
-                    <View key={index} style={styles.detectionChip}>
-                      <Text style={styles.detectionName}>{det.class_name}</Text>
-                      <Text style={styles.detectionConfidence}>
-                        {Math.round(det.confidence * 100)}%
-                      </Text>
-                      <Text style={styles.detectionPosition}>{det.position}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.noDetectionsText}>No specific objects detected</Text>
-              )}
             </View>
 
             {/* AI Description */}
             <View style={styles.resultSection}>
-              <View style={styles.resultHeader}>
-                <Ionicons name="chatbubble" size={20} color="#D900FF" />
-                <Text style={styles.resultTitle}>AI Analysis</Text>
-              </View>
+              <Text style={styles.resultTitle}>AI Analysis</Text>
               <Text style={styles.aiDescription}>{analysisResult.ai_description}</Text>
             </View>
 
-            {/* Safety Warnings */}
+            {/* Warnings */}
             {analysisResult.safety_warnings.length > 0 && (
               <View style={[styles.resultSection, styles.warningSection]}>
-                <View style={styles.resultHeader}>
-                  <Ionicons name="warning" size={20} color="#F44336" />
-                  <Text style={styles.resultTitle}>Safety Warnings</Text>
-                </View>
-                {analysisResult.safety_warnings.map((warning, index) => (
-                  <Text key={index} style={styles.warningText}>
-                    • {warning}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            {/* Navigation Hints */}
-            {analysisResult.navigation_hints.length > 0 && (
-              <View style={styles.resultSection}>
-                <View style={styles.resultHeader}>
-                  <Ionicons name="navigate" size={20} color="#4CAF50" />
-                  <Text style={styles.resultTitle}>Navigation Tips</Text>
-                </View>
-                {analysisResult.navigation_hints.map((hint, index) => (
-                  <Text key={index} style={styles.hintText}>
-                    • {hint}
-                  </Text>
+                <Text style={styles.warningTitle}>Warnings</Text>
+                {analysisResult.safety_warnings.map((w, i) => (
+                  <Text key={i} style={styles.warningText}>• {w}</Text>
                 ))}
               </View>
             )}
@@ -475,116 +377,54 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f1e',
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#0f0f1e' },
+  scrollView: { flex: 1 },
   speakingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#1a3a5e',
     padding: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
   },
-  speakingText: {
-    color: '#00D9FF',
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  profileSelector: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
+  speakingText: { color: '#00D9FF', marginLeft: 8, flex: 1, fontWeight: '600' },
+  stopBtn: { backgroundColor: '#F44336', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+  stopBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  profileSelector: { paddingHorizontal: 16, paddingVertical: 12 },
   profileButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1a1a2e',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
     marginRight: 10,
   },
-  profileButtonActive: {
-    backgroundColor: '#1a3a5e',
-    borderColor: '#00D9FF',
-    borderWidth: 1,
-  },
-  profileButtonText: {
-    color: '#888',
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  profileButtonTextActive: {
-    color: '#00D9FF',
-  },
+  profileButtonActive: { backgroundColor: '#1a3a5e', borderWidth: 1, borderColor: '#00D9FF' },
+  profileButtonText: { color: '#888', marginLeft: 6, fontSize: 13 },
+  profileButtonTextActive: { color: '#00D9FF' },
   cameraContainer: {
     marginHorizontal: 16,
-    height: 300,
+    height: 280,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1a1a2e',
   },
-  cameraWrapper: {
-    flex: 1,
-    position: 'relative',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'space-between',
-  },
-  cameraStatusBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  cameraLiveIndicator: {
+  cameraWrapper: { flex: 1, position: 'relative' },
+  camera: { flex: 1 },
+  cameraOverlay: { position: 'absolute', top: 12, left: 12 },
+  liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#F44336',
-    marginRight: 6,
-  },
-  liveText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  autoModeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  autoModeText: {
-    color: '#4CAF50',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  capturedImage: {
-    flex: 1,
-  },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F44336', marginRight: 6 },
+  liveText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  capturedImage: { flex: 1 },
   uploadArea: {
     flex: 1,
     justifyContent: 'center',
@@ -595,107 +435,41 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
   },
-  uploadText: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 12,
-    fontWeight: '600',
-  },
-  uploadSubtext: {
-    color: '#444',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  controlsContainer: {
-    padding: 16,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  controlButton: {
-    alignItems: 'center',
-    padding: 12,
-  },
-  controlButtonActive: {
-    backgroundColor: '#1a3a2e',
-    borderRadius: 12,
-  },
-  controlButtonText: {
-    color: '#888',
-    fontSize: 12,
-    marginTop: 4,
-  },
+  uploadText: { color: '#666', fontSize: 14, marginTop: 12, fontWeight: '600' },
+  controlsContainer: { padding: 16 },
+  controlsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  controlButton: { alignItems: 'center', padding: 12 },
+  controlButtonText: { color: '#888', fontSize: 12, marginTop: 4 },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: '#00D9FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButtonDisabled: {
-    backgroundColor: '#555',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    padding: 24,
-  },
-  loadingText: {
-    color: '#888',
-    marginTop: 12,
-    fontSize: 14,
-  },
-  resultsContainer: {
-    padding: 16,
-  },
+  captureButtonDisabled: { backgroundColor: '#555' },
+  loadingContainer: { alignItems: 'center', padding: 24 },
+  loadingText: { color: '#888', marginTop: 12 },
+  resultsContainer: { padding: 16 },
   speakResultButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#00D9FF',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 18,
     marginBottom: 16,
   },
-  speakResultText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
+  speakResultText: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
   resultSection: {
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
-  warningSection: {
-    backgroundColor: '#2a1a1e',
-    borderLeftWidth: 3,
-    borderLeftColor: '#F44336',
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  resultTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-    flex: 1,
-  },
-  detectionCount: {
-    color: '#00D9FF',
-    fontSize: 12,
-  },
-  detectionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
+  resultTitle: { color: '#00D9FF', fontSize: 14, fontWeight: '600', marginBottom: 10 },
+  detectionsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   detectionChip: {
     backgroundColor: '#2a2a4e',
     paddingHorizontal: 12,
@@ -704,37 +478,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  detectionName: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  detectionConfidence: {
-    color: '#00D9FF',
-    fontSize: 11,
-  },
-  detectionPosition: {
-    color: '#888',
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  noDetectionsText: {
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  aiDescription: {
-    color: '#ccc',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  warningText: {
-    color: '#F44336',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  hintText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    marginBottom: 4,
-  },
+  detectionName: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  detectionInfo: { color: '#888', fontSize: 10 },
+  aiDescription: { color: '#ccc', fontSize: 15, lineHeight: 22 },
+  warningSection: { backgroundColor: '#2a1a1e', borderLeftWidth: 3, borderLeftColor: '#F44336' },
+  warningTitle: { color: '#F44336', fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  warningText: { color: '#F44336', fontSize: 14, marginBottom: 4 },
 });

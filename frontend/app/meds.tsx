@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import * as Speech from 'expo-speech';
+import { useAudioPlayer } from 'expo-audio';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -26,120 +28,6 @@ interface Reminder {
   repeat_daily: boolean;
   enabled: boolean;
 }
-
-// Alarm sound using Web Audio API
-const createAlarmSound = () => {
-  let audioContext: AudioContext | null = null;
-  let oscillators: OscillatorNode[] = [];
-  let isPlaying = false;
-  
-  const playAlarm = () => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      return false;
-    }
-    
-    try {
-      // Create or resume AudioContext
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-      
-      isPlaying = true;
-      
-      // Create alarm pattern: beep-beep-beep
-      const playBeep = (startTime: number, frequency: number, duration: number) => {
-        const oscillator = audioContext!.createOscillator();
-        const gainNode = audioContext!.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext!.destination);
-        
-        oscillator.type = 'sine';
-        oscillator.frequency.value = frequency;
-        
-        gainNode.gain.setValueAtTime(0.5, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-        
-        oscillators.push(oscillator);
-      };
-      
-      const now = audioContext.currentTime;
-      
-      // Play alarm pattern multiple times
-      for (let i = 0; i < 5; i++) {
-        const offset = i * 1.5;
-        playBeep(now + offset, 880, 0.2);       // A5
-        playBeep(now + offset + 0.3, 880, 0.2); // A5
-        playBeep(now + offset + 0.6, 1047, 0.3); // C6
-      }
-      
-      console.log('Alarm sound playing');
-      return true;
-    } catch (error) {
-      console.error('Audio error:', error);
-      return false;
-    }
-  };
-  
-  const stopAlarm = () => {
-    isPlaying = false;
-    oscillators.forEach(osc => {
-      try { osc.stop(); } catch (e) {}
-    });
-    oscillators = [];
-  };
-  
-  const getIsPlaying = () => isPlaying;
-  
-  return { playAlarm, stopAlarm, getIsPlaying };
-};
-
-const alarmSound = createAlarmSound();
-
-// Speech synthesis
-const speak = (text: string, rate: number = 0.9): Promise<void> => {
-  return new Promise((resolve) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = rate;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      utterance.lang = 'en-US';
-      
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-      
-      // Ensure voices are loaded
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        utterance.voice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-      }
-      
-      window.speechSynthesis.speak(utterance);
-    } else {
-      import('expo-speech').then(Speech => {
-        Speech.speak(text, { rate, pitch: 1.0, onDone: () => resolve() });
-      }).catch(() => resolve());
-    }
-  });
-};
-
-const stopSpeaking = () => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-  } else {
-    import('expo-speech').then(Speech => Speech.stop());
-  }
-};
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -162,23 +50,34 @@ export default function MedsScreen() {
   const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Generate a beep sound using data URI
+  const beepDataUri = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQQAhfXqz6VWGQ5/3fTp4LpyKA1o0N7h4NyoYRQAetvs8e3drI1SHQB97PPx8OzjzJRdEAB+9fHp5+HX0aiTbzUbAHrn2c/Ly8/R0Mq9rZVpRB8Ja8DEzMzNyMPBuK6rnXdPKBJlqLK3tay1u7vBwbipnnBQKBlfn7XCu7Oys7W2urm3sqiZgF0vGVqWrbi4sa6tsLO2uLi1sqaYhWMyH1aUq7SyrqqqrrS3t7WzraSYhWQ3IViVqrOxrKiprrO1trSyr6WYhmU4JFuYqrGura2rsLS2trOxrKSWhGM2I1mWqbGura2rsLS1tLGvrKOVhGI1I1mWqbGtra2rsLO0s7CurKOVhGI1I1mVqbCtramqrrKzsrCurKOVg2E0IliVqLCtramqrrKysK+urKKVg2E0IliUp7Csraqprq+xsK6trKKUgmE0IVeUp7Crq6mprq+wr62sq6KUgmA0IVaUp7CrrKmprq6wr62sq6GUgWA0IVaUp7CrrKmprq6vr62sq6GTgGA0IFaUp7CrrKmprq6vr62sq6GTgGAzIFaUpq+rrKmprq6vr6ysqqGTgGAzIFaUpq+rq6mprq6vr6ysqqCSf18zIFaUpq+rq6mprq6ur6ysqqCSf18zIFWTpq+rq6mprq2ur6yrqqCSf18zIFWTpq+rq6iprq2ur6yrqqCSf18zIFWTpq6rq6iprq2urqyrqqCRf14yH1WTpa6rq6iprq2urqyrqaCRfl4yH1WTpa6qqqiprqyurquqqaCRfl4yH1STpa6qqqiprqyurquqqaCRfl4yH1STpa6qqqioray';
+
   useEffect(() => {
     loadReminders();
     requestNotificationPermissions();
     
-    // Load voices for speech
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-    }
+    // Speak welcome
+    setTimeout(() => {
+      speakText('Medication reminders. Add new reminders or test the alarm.');
+    }, 500);
     
     return () => {
       if (alarmIntervalRef.current) {
         clearInterval(alarmIntervalRef.current);
       }
-      alarmSound.stopAlarm();
-      stopSpeaking();
+      Speech.stop();
     };
   }, []);
+
+  const speakText = (text: string, rate: number = 0.9) => {
+    Speech.stop();
+    Speech.speak(text, {
+      rate,
+      pitch: 1.0,
+      language: 'en-US',
+    });
+  };
 
   const requestNotificationPermissions = async () => {
     try {
@@ -207,7 +106,7 @@ export default function MedsScreen() {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '💊 Medication Reminder',
+          title: 'Medication Reminder',
           body: `Time to take ${reminder.name}`,
           sound: true,
           priority: Notifications.AndroidNotificationPriority.HIGH,
@@ -225,7 +124,7 @@ export default function MedsScreen() {
 
   const addReminder = async () => {
     if (!newMedName.trim()) {
-      await speak('Please enter a medication name');
+      speakText('Please enter a medication name');
       Alert.alert('Error', 'Please enter a medication name');
       return;
     }
@@ -234,13 +133,13 @@ export default function MedsScreen() {
     const minute = parseInt(newMinute) || 0;
 
     if (hour < 0 || hour > 23) {
-      await speak('Hour must be between 0 and 23');
+      speakText('Hour must be between 0 and 23');
       Alert.alert('Error', 'Hour must be between 0 and 23');
       return;
     }
 
     if (minute < 0 || minute > 59) {
-      await speak('Minute must be between 0 and 59');
+      speakText('Minute must be between 0 and 59');
       Alert.alert('Error', 'Minute must be between 0 and 59');
       return;
     }
@@ -270,13 +169,13 @@ export default function MedsScreen() {
         setRepeatDaily(true);
 
         const timeStr = formatTime(hour, minute);
-        await speak(`Reminder set for ${newReminder.name} at ${timeStr}`);
+        speakText(`Reminder set for ${newReminder.name} at ${timeStr}`);
       } else {
         throw new Error('Failed to create reminder');
       }
     } catch (error) {
       console.error('Error adding reminder:', error);
-      await speak('Failed to create reminder');
+      speakText('Failed to create reminder');
       Alert.alert('Error', 'Failed to create reminder');
     } finally {
       setIsLoading(false);
@@ -291,7 +190,7 @@ export default function MedsScreen() {
 
       if (response.ok) {
         setReminders((prev) => prev.filter((r) => r.id !== id));
-        await speak(`Reminder for ${name} deleted`);
+        speakText(`Reminder for ${name} deleted`);
       }
     } catch (error) {
       console.error('Error deleting reminder:', error);
@@ -309,7 +208,7 @@ export default function MedsScreen() {
         setReminders((prev) =>
           prev.map((r) => (r.id === id ? { ...r, enabled: result.enabled } : r))
         );
-        await speak(`Reminder for ${name} ${result.enabled ? 'enabled' : 'disabled'}`);
+        speakText(`Reminder for ${name} ${result.enabled ? 'enabled' : 'disabled'}`);
       }
     } catch (error) {
       console.error('Error toggling reminder:', error);
@@ -319,36 +218,41 @@ export default function MedsScreen() {
   const testAlarm = async () => {
     setIsAlarmPlaying(true);
     
-    // Play audio alarm
-    const audioPlayed = alarmSound.playAlarm();
-    
     // Vibrate on mobile
     if (Platform.OS !== 'web') {
-      Vibration.vibrate([0, 500, 200, 500, 200, 500], false);
+      Vibration.vibrate([0, 1000, 500, 1000, 500, 1000], false);
     }
     
-    // Speak the alarm message
-    await speak(
-      'ATTENTION! MEDICATION REMINDER! It is time to take your medication!',
-      0.85
+    // Speak the alarm message LOUDLY - this is the main alarm sound
+    Speech.stop();
+    Speech.speak(
+      'ATTENTION! MEDICATION REMINDER! It is time to take your medication! Please take your medicine now!',
+      {
+        rate: 0.8,
+        pitch: 1.2,
+        language: 'en-US',
+      }
     );
     
-    // Repeat alarm sound
-    let repeatCount = 0;
+    // Repeat alarm speech
+    let count = 0;
     alarmIntervalRef.current = setInterval(() => {
-      if (repeatCount < 3) {
-        alarmSound.playAlarm();
-        repeatCount++;
+      if (count < 2) {
+        Speech.speak('ATTENTION! Time for your medication!', {
+          rate: 0.8,
+          pitch: 1.2,
+          language: 'en-US',
+        });
+        count++;
       } else {
         stopAlarm();
       }
-    }, 2000);
+    }, 4000);
   };
 
   const stopAlarm = () => {
     setIsAlarmPlaying(false);
-    alarmSound.stopAlarm();
-    stopSpeaking();
+    Speech.stop();
     
     if (Platform.OS !== 'web') {
       Vibration.cancel();
@@ -358,6 +262,8 @@ export default function MedsScreen() {
       clearInterval(alarmIntervalRef.current);
       alarmIntervalRef.current = null;
     }
+    
+    speakText('Alarm stopped.');
   };
 
   const formatTime = (hour: number, minute: number) => {
@@ -375,6 +281,17 @@ export default function MedsScreen() {
         keyboardVerticalOffset={100}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* Alarm Playing Banner */}
+          {isAlarmPlaying && (
+            <View style={styles.alarmBanner}>
+              <Ionicons name="notifications" size={24} color="#fff" />
+              <Text style={styles.alarmBannerText}>ALARM PLAYING</Text>
+              <TouchableOpacity onPress={stopAlarm} style={styles.stopAlarmBtn}>
+                <Text style={styles.stopAlarmBtnText}>STOP</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Add Reminder Form */}
           <View style={styles.formSection}>
             <View style={styles.sectionHeader}>
@@ -441,30 +358,25 @@ export default function MedsScreen() {
           {/* Test Alarm */}
           <View style={styles.testSection}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="notifications" size={24} color="#F44336" />
-              <Text style={styles.sectionTitle}>Test Alarm</Text>
+              <Ionicons name="volume-high" size={24} color="#F44336" />
+              <Text style={styles.sectionTitle}>Test Alarm Sound</Text>
             </View>
             <Text style={styles.testDescription}>
-              Test the alarm sound and voice. Make sure your volume is up!
+              Test the alarm. Make sure your phone volume is turned UP!
             </Text>
             <TouchableOpacity
               style={[styles.testButton, isAlarmPlaying && styles.testButtonActive]}
               onPress={isAlarmPlaying ? stopAlarm : testAlarm}
             >
               <Ionicons
-                name={isAlarmPlaying ? 'stop-circle' : 'volume-high'}
-                size={28}
+                name={isAlarmPlaying ? 'stop-circle' : 'megaphone'}
+                size={32}
                 color={isAlarmPlaying ? '#fff' : '#F44336'}
               />
               <Text style={[styles.testButtonText, isAlarmPlaying && styles.testButtonTextActive]}>
-                {isAlarmPlaying ? 'STOP ALARM' : 'TEST ALARM SOUND'}
+                {isAlarmPlaying ? 'STOP ALARM' : 'TEST ALARM'}
               </Text>
             </TouchableOpacity>
-            {isAlarmPlaying && (
-              <Text style={styles.alarmPlayingText}>
-                🔊 Alarm is playing - tap to stop
-              </Text>
-            )}
           </View>
 
           {/* Active Reminders */}
@@ -472,15 +384,14 @@ export default function MedsScreen() {
             <View style={styles.sectionHeader}>
               <Ionicons name="medical" size={24} color="#4CAF50" />
               <Text style={styles.sectionTitle}>
-                Active Reminders ({reminders.length})
+                Reminders ({reminders.length})
               </Text>
             </View>
 
             {reminders.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="medical-outline" size={48} color="#333" />
-                <Text style={styles.emptyStateText}>No reminders set yet</Text>
-                <Text style={styles.emptyStateSubtext}>Add a reminder above to get started</Text>
+                <Text style={styles.emptyStateText}>No reminders yet</Text>
               </View>
             ) : (
               reminders.map((reminder) => (
@@ -497,7 +408,6 @@ export default function MedsScreen() {
                       </Text>
                       {reminder.repeat_daily && (
                         <View style={styles.repeatBadge}>
-                          <Ionicons name="repeat" size={12} color="#00D9FF" />
                           <Text style={styles.repeatText}>Daily</Text>
                         </View>
                       )}
@@ -513,21 +423,13 @@ export default function MedsScreen() {
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() =>
-                        Alert.alert(
-                          'Delete Reminder',
-                          `Delete reminder for ${reminder.name}?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Delete',
-                              style: 'destructive',
-                              onPress: () => deleteReminder(reminder.id, reminder.name),
-                            },
-                          ]
-                        )
+                        Alert.alert('Delete?', `Delete ${reminder.name}?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => deleteReminder(reminder.id, reminder.name) },
+                        ])
                       }
                     >
-                      <Ionicons name="trash-outline" size={20} color="#F44336" />
+                      <Ionicons name="trash-outline" size={22} color="#F44336" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -544,6 +446,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f1e' },
   keyboardAvoid: { flex: 1 },
   scrollView: { flex: 1, paddingHorizontal: 16 },
+  alarmBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F44336',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  alarmBannerText: { color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1, marginLeft: 10 },
+  stopAlarmBtn: { backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
+  stopAlarmBtnText: { color: '#F44336', fontWeight: 'bold' },
   formSection: {
     backgroundColor: '#1a1a2e',
     borderRadius: 16,
@@ -611,38 +524,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginTop: 8,
   },
   addButtonDisabled: { backgroundColor: '#333' },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
   testSection: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#2a1a1e',
     borderRadius: 16,
     padding: 16,
     marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#F44336',
   },
-  testDescription: { color: '#888', fontSize: 14, marginBottom: 12, lineHeight: 20 },
+  testDescription: { color: '#F44336', fontSize: 14, marginBottom: 16, fontWeight: '500' },
   testButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2a1a1e',
+    backgroundColor: '#1a1a2e',
     borderRadius: 12,
-    paddingVertical: 18,
+    paddingVertical: 20,
     borderWidth: 2,
     borderColor: '#F44336',
   },
   testButtonActive: { backgroundColor: '#F44336' },
-  testButtonText: { color: '#F44336', fontSize: 18, fontWeight: '600', marginLeft: 12 },
+  testButtonText: { color: '#F44336', fontSize: 20, fontWeight: 'bold', marginLeft: 12 },
   testButtonTextActive: { color: '#fff' },
-  alarmPlayingText: {
-    color: '#F44336',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 12,
-    fontWeight: '600',
-  },
   remindersSection: { marginTop: 16, marginBottom: 24 },
   emptyState: {
     alignItems: 'center',
@@ -651,7 +559,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   emptyStateText: { color: '#666', fontSize: 16, marginTop: 12 },
-  emptyStateSubtext: { color: '#444', fontSize: 13, marginTop: 4 },
   reminderCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -666,15 +573,13 @@ const styles = StyleSheet.create({
   reminderTimeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
   reminderTime: { color: '#888', fontSize: 14, marginLeft: 6 },
   repeatBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#00D9FF22',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
     marginLeft: 10,
   },
-  repeatText: { color: '#00D9FF', fontSize: 11, marginLeft: 4 },
+  repeatText: { color: '#00D9FF', fontSize: 11 },
   reminderActions: { flexDirection: 'row', alignItems: 'center' },
   deleteButton: { padding: 8, marginLeft: 8 },
 });
