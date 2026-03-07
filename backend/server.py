@@ -176,8 +176,8 @@ async def run_yolo_detection(image: Image.Image) -> tuple:
         tmp_path = tmp.name
     
     try:
-        # Run detection
-        results = model(tmp_path, verbose=False)
+        # Run detection with better settings for accuracy
+        results = model(tmp_path, verbose=False, conf=0.20, imgsz=1280)
         
         detections = []
         img_width = image.width
@@ -190,7 +190,7 @@ async def run_yolo_detection(image: Image.Image) -> tuple:
                     cls = int(box.cls[0])
                     class_name = model.names[cls]
                     
-                    if conf > 0.3:  # Confidence threshold
+                    if conf > 0.20:  # Lower confidence threshold for more detections
                         detection = DetectionResult(
                             class_name=class_name,
                             confidence=round(conf, 2),
