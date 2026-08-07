@@ -213,6 +213,22 @@ function utter(text, rate){
   if (v) u.voice = v;
   return u;
 }
+/* iPhones mute speech that was not "unlocked" by a screen touch. The very
+   first tap anywhere quietly unlocks the voice, so replies to spoken
+   commands (which arrive outside any tap) are always audible. */
+let ttsUnlocked = false;
+function unlockTTS(){
+  if (ttsUnlocked) return; ttsUnlocked = true;
+  try{
+    speechSynthesis.resume();
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0; u.rate = 2;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+document.body.addEventListener("pointerdown", unlockTTS, true);
+document.body.addEventListener("touchstart", unlockTTS, true);
+
 function speak(text, opts){
   opts = opts || {};
   if (!text) return;
@@ -221,16 +237,24 @@ function speak(text, opts){
   if (opts.mirror !== false) addBubble("vica", text);
   try{
     speechSynthesis.cancel();
+    speechSynthesis.resume();   /* iOS can wedge in a paused state — always clear it */
     const u = utter(text);
-    u.onstart = () => { speaking = true; pauseListening(); setMic("speak"); };
-    u.onend = u.onerror = () => { speaking = false; setMic("idle"); setTimeout(resumeListening, 300); };
+    u.onstart = () => { speaking = true; pauseListening(); setMic("speak"); startSynthKeepalive(); };
+    u.onend = u.onerror = () => { stopSynthKeepalive(); speaking = false; setMic("idle"); setTimeout(resumeListening, 300); };
     speechSynthesis.speak(u);
   }catch(e){ speaking = false; }
 }
+/* iPhones stop long sentences halfway unless the voice is nudged along */
+let synthKeepalive = null;
+function startSynthKeepalive(){
+  stopSynthKeepalive();
+  synthKeepalive = setInterval(()=>{ try{ speechSynthesis.resume(); }catch(e){} }, 5000);
+}
+function stopSynthKeepalive(){ if (synthKeepalive){ clearInterval(synthKeepalive); synthKeepalive = null; } }
 /* short acknowledgement that does NOT stop the microphone */
 function speakAck(text){
   lastSpoken = text; el.liveLine.textContent = text; addBubble("vica", text);
-  try{ speechSynthesis.speak(utter(text, 105)); }catch(e){}
+  try{ speechSynthesis.resume(); speechSynthesis.speak(utter(text, 105)); }catch(e){}
 }
 function addBubble(who, text){
   const d = document.createElement("div");
@@ -2076,4 +2100,20 @@ window.addEventListener("load", ()=>{ setTimeout(()=>{ if (window.AUTH) AUTH.sta
 document.body.addEventListener("pointerdown", function once(){ ac(); document.body.removeEventListener("pointerdown", once); });
 window.addEventListener("online",  ()=>{ if (window.AUTH){ AUTH.renderCloudBadges(); AUTH.renderCloudStatus(); } });
 window.addEventListener("offline", ()=>{ if (window.AUTH){ AUTH.renderCloudBadges(); AUTH.renderCloudStatus(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+/* updates install themselves: when a new version is ready the page reloads
+   once, so nobody has to know what a cache is */
+if ("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    reg.addEventListener("updatefound", () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener("statechange", () => {
+        if (nw.state === "activated" && navigator.serviceWorker.controller &&
+            !sessionStorage.getItem("nv.reloaded")){
+          sessionStorage.setItem("nv.reloaded", "1");
+          location.reload();
+        }
+      });
+    });
+  }).catch(()=>{});
+}
