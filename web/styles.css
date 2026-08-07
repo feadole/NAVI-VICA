@@ -234,21 +234,29 @@ h3{font-size:1rem;color:var(--teal);margin-top:.6rem}
 
 /* ============ ONE-SCREEN HOME — everything visible, nothing scrolls ============ */
 #home .scroll{overflow:hidden;justify-content:space-between;gap:.55rem;padding-bottom:calc(var(--bar) + .55rem)}
-#home .greet-card{flex:0 0 auto;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:.88rem;line-height:1.35}
+#home .greet-card{flex:0 0 auto;font-size:.88rem;line-height:1.35;padding:.7rem .9rem}
+#home .greet-card p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 #home .mic-zone{flex:0 0 auto;gap:.4rem}
-.mic{width:clamp(4.2rem,16dvh,6rem);height:clamp(4.2rem,16dvh,6rem);background:radial-gradient(circle at 30% 28%,#4D95E6,var(--blue));transition:transform .12s}
-.mic.listen{background:radial-gradient(circle at 30% 28%,#41B87E,var(--green))}
-.mic.speak{background:radial-gradient(circle at 30% 28%,#E0654E,var(--red))}
+.mic{width:clamp(4.2rem,15dvh,5.6rem);height:clamp(4.2rem,15dvh,5.6rem);background:radial-gradient(circle at 30% 28%,#4D95E6,var(--blue));transition:transform .12s;box-shadow:0 10px 26px rgba(46,124,214,.35)}
+.mic.listen{background:radial-gradient(circle at 30% 28%,#41B87E,var(--green));box-shadow:0 10px 26px rgba(46,158,102,.4)}
+.mic.speak{background:radial-gradient(circle at 30% 28%,#E0654E,var(--red));box-shadow:0 10px 26px rgba(201,67,47,.35)}
 #home .live-line{min-height:1.15rem;font-size:.85rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-#homeGrid{flex:1 1 auto;min-height:0;grid-auto-rows:1fr}
-#homeGrid .tile{min-height:0;height:100%}
+/* the four big tiles: content always INSIDE the pill, scaling with the screen */
+#homeGrid{flex:1 1 auto;min-height:0;grid-auto-rows:minmax(4.6rem,1fr);align-content:stretch}
+#homeGrid .tile{min-height:0;height:auto;overflow:hidden;padding:.45rem .5rem;gap:.15rem;border-radius:24px;
+  font-size:clamp(.82rem,2.1dvh,1.02rem)}
+#homeGrid .tile .ico{font-size:clamp(1.35rem,4.4dvh,2.2rem)}
 .home-foot{display:flex;gap:.6rem;flex:0 0 auto}
-.home-foot .big-tile{min-height:3.1rem;flex:1;font-size:.9rem}
-.home-foot .big-tile .ico{font-size:1.4rem}
-@media (max-height:640px){ #home .greet-card{display:none} }
-@media (max-height:560px){ html{font-size:17px} .mic{width:4rem;height:4rem} }
+.home-foot .big-tile{min-height:3.1rem;flex:1;font-size:.88rem;padding:.4rem .5rem}
+.home-foot .big-tile .ico{font-size:1.35rem}
+@media (max-height:700px){ #home .greet-card{display:none} }
+@media (max-height:580px){ html{font-size:17px} .mic{width:4rem;height:4rem} }
 
 /* a touch more life across the app */
-.tile{transition:transform .12s, box-shadow .12s}
+.topbar{background:linear-gradient(135deg,#137066,#0F5B54)}
+.tile{transition:transform .12s, box-shadow .12s;box-shadow:0 6px 18px rgba(20,60,55,.16)}
 .tile:active{box-shadow:0 3px 10px rgba(20,60,55,.18)}
 .status-pill{box-shadow:var(--sh)}
+.greet-card{box-shadow:var(--sh)}
+.big-tile{border-radius:24px}
+.bottombar{box-shadow:0 -6px 20px rgba(20,60,55,.08)}

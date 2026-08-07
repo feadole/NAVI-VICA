@@ -128,7 +128,7 @@ function openView(id){
   if (id !== "read" && readStream) stopRead();
 }
 document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", ()=>openView(b.dataset.open)));
-document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", ()=>openView("home")));
+document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", ()=>{ openView("home"); speakAck(T("barHome")); }));
 el.barHome.addEventListener("click", ()=>openView("home"));
 
 /* ---------- haptics & tones ---------- */
@@ -1412,6 +1412,9 @@ function runAction(name, args, source){
   const fn = ACTIONS[name];
   if (!fn) return false;
   if (source === "touch" && PHRASE_FOR[name]) addBubble("user", T(PHRASE_FOR[name]));
+  /* every doorway announces itself out loud (pages that greet on their own,
+     like the guide, are left to do their talking) */
+  if (PHRASE_FOR[name] && name !== "open_guide") speakAck(T(PHRASE_FOR[name]));
   try{ fn(args||{}); }
   catch(e){ console.warn("action",name,e); speak(T("actionFailed")); }
   return true;
@@ -1953,18 +1956,28 @@ function applyScale(){
 /* ===================================================================
    SIGN-IN HOOK — auth.js calls this once a person is authenticated
    =================================================================== */
-let greeted = false;
+let greeted = false, greetHeard = false;
 function greetNow(text){
   if (greeted) return; greeted = true;
   const g = text || buildGreeting(); addBubble("vica", g); lastSpoken = g;
-  try{
+  const attempt = ()=>{ try{
     speechSynthesis.cancel();
     const u = utter(g);
-    u.onstart = ()=>{ speaking=true; setMic("speak"); };
+    u.onstart = ()=>{ greetHeard=true; speaking=true; setMic("speak"); };
     u.onend = u.onerror = ()=>{ speaking=false; setMic("idle"); wantListen=true; startWake(); };
     speechSynthesis.speak(u);
-    setTimeout(()=>{ if (!speaking && !wantListen){ wantListen=true; startWake(); } }, 2500);
-  }catch(e){ wantListen=true; startWake(); }
+  }catch(e){ wantListen=true; startWake(); } };
+  attempt();
+  setTimeout(()=>{ if (!speaking && !wantListen){ wantListen=true; startWake(); } }, 2500);
+  /* phones block speech until the person touches the screen once — so the
+     spoken hello simply waits for that very first touch */
+  setTimeout(()=>{
+    if (greetHeard) return;
+    document.body.addEventListener("pointerdown", function retry(ev){
+      document.body.removeEventListener("pointerdown", retry);
+      if (!greetHeard && !speaking && !ev.target.closest("button,a,input,select,textarea")) attempt();
+    });
+  }, 700);
 }
 
 /* called by auth.js */

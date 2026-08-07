@@ -642,6 +642,8 @@ function applyAuthLang(){
   set("acTransferTitle","acTransferTitle"); set("acTransferNote","acTransferNote");
   set("acExportLabel","acExportLabel"); set("acImportLabel","acImportLabel");
   set("acSignoutLabel","acSignoutLabel"); set("acDeleteLabel","acDeleteLabel");
+  /* dynamic notes must follow the language too, not stay in English */
+  renderCloudBadges(); renderCloudStatus();
 }
 
 return { start, renderAccount, applyAuthLang, renderCloudStatus, renderCloudBadges, list: ()=>list, current };
