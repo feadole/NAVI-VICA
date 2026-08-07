@@ -232,25 +232,33 @@ h3{font-size:1rem;color:var(--teal);margin-top:.6rem}
   border-radius:16px;background:var(--teal-soft);color:var(--teal);cursor:pointer;padding:.7rem 1rem}
 .choice:active{background:var(--teal);color:#fff}
 
-/* ============ ONE-SCREEN HOME — everything visible, nothing scrolls ============ */
+/* ============ ONE-SCREEN HOME — calm, simple, always fits ============ */
 #home .scroll{overflow:hidden;justify-content:space-between;gap:.55rem;padding-bottom:calc(var(--bar) + .55rem)}
-#home .greet-card{flex:0 0 auto;font-size:.88rem;line-height:1.35;padding:.7rem .9rem}
-#home .greet-card p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-#home .mic-zone{flex:0 0 auto;gap:.4rem}
-.mic{width:clamp(4.2rem,15dvh,5.6rem);height:clamp(4.2rem,15dvh,5.6rem);background:radial-gradient(circle at 30% 28%,#4D95E6,var(--blue));transition:transform .12s;box-shadow:0 10px 26px rgba(46,124,214,.35)}
+/* the greeting is spoken, not read: home shows only what the person acts on */
+#home .greet-card{display:none}
+#home .mic-zone{flex:0 0 auto;gap:.4rem;padding-top:.4rem}
+.mic{width:clamp(4.2rem,15dvh,6rem);height:clamp(4.2rem,15dvh,6rem);background:radial-gradient(circle at 30% 28%,#4D95E6,var(--blue));transition:transform .12s;box-shadow:0 10px 26px rgba(46,124,214,.35)}
 .mic.listen{background:radial-gradient(circle at 30% 28%,#41B87E,var(--green));box-shadow:0 10px 26px rgba(46,158,102,.4)}
 .mic.speak{background:radial-gradient(circle at 30% 28%,#E0654E,var(--red));box-shadow:0 10px 26px rgba(201,67,47,.35)}
 #home .live-line{min-height:1.15rem;font-size:.85rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-/* the four big tiles: content always INSIDE the pill, scaling with the screen */
-#homeGrid{flex:1 1 auto;min-height:0;grid-auto-rows:minmax(4.6rem,1fr);align-content:stretch}
+/* the four big tiles: rows share the free space, content never spills out */
+#homeGrid{flex:1 1 auto;min-height:0;grid-auto-rows:minmax(0,1fr);align-content:stretch;overflow:hidden}
 #homeGrid .tile{min-height:0;height:auto;overflow:hidden;padding:.45rem .5rem;gap:.15rem;border-radius:24px;
-  font-size:clamp(.82rem,2.1dvh,1.02rem)}
-#homeGrid .tile .ico{font-size:clamp(1.35rem,4.4dvh,2.2rem)}
+  font-size:clamp(.82rem,2.1dvh,1.05rem)}
+#homeGrid .tile .ico{font-size:clamp(1.35rem,5dvh,2.4rem)}
 .home-foot{display:flex;gap:.6rem;flex:0 0 auto}
 .home-foot .big-tile{min-height:3.1rem;flex:1;font-size:.88rem;padding:.4rem .5rem}
 .home-foot .big-tile .ico{font-size:1.35rem}
-@media (max-height:700px){ #home .greet-card{display:none} }
 @media (max-height:580px){ html{font-size:17px} .mic{width:4rem;height:4rem} }
+
+/* ============ WELCOME-FIRST: floating voice & chat, nothing else ============ */
+.float-side{position:fixed;right:.75rem;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:.8rem;z-index:800}
+body.on-auth .float-side{display:flex}
+body.on-auth .bottombar{display:none}
+[dir="rtl"] .float-side{right:auto;left:.75rem}
+.float-btn{width:3.7rem;height:3.7rem;border-radius:50%;border:none;font-size:1.55rem;color:#fff;background:var(--teal);box-shadow:0 8px 22px rgba(15,91,84,.35);cursor:pointer}
+.float-btn:active{transform:scale(.94)}
+.float-mic{background:radial-gradient(circle at 30% 28%,#4D95E6,var(--blue))}
 
 /* a touch more life across the app */
 .topbar{background:linear-gradient(135deg,#137066,#0F5B54)}

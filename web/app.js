@@ -117,6 +117,7 @@ function openView(id){
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   const v = $(id); if (!v) return;
   v.classList.add("active"); currentView = id;
+  document.body.classList.toggle("on-auth", v.classList.contains("auth"));
   if (id === "nav" && mapObj) setTimeout(()=>mapObj.invalidateSize(), 180);
   if (id === "chat") setTimeout(()=>{ el.chatLog.parentElement.scrollTop = el.chatLog.parentElement.scrollHeight; }, 60);
   if (id === "find") renderFind();
@@ -128,7 +129,11 @@ function openView(id){
   if (id !== "read" && readStream) stopRead();
 }
 document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", ()=>openView(b.dataset.open)));
-document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", ()=>{ openView("home"); speakAck(T("barHome")); }));
+document.querySelectorAll("[data-back]").forEach(b => b.addEventListener("click", ()=>{
+  /* a guest exploring chat or voice from the welcome screen goes back there */
+  if (window.AUTH && !AUTH.current()){ AUTH.start(); return; }
+  openView("home"); speakAck(T("barHome"));
+}));
 el.barHome.addEventListener("click", ()=>openView("home"));
 
 /* ---------- haptics & tones ---------- */
@@ -2048,6 +2053,9 @@ if (voiceSel) voiceSel.addEventListener("change", ()=>{
 });
 el.profileSelect.addEventListener("change", ()=>setProfile(el.profileSelect.value));
 el.acctBtn.addEventListener("click", ()=>press("open_account"));
+const floatMic = document.getElementById("floatMic"), floatChat = document.getElementById("floatChat");
+if (floatMic) floatMic.addEventListener("click", ()=>micTap());
+if (floatChat) floatChat.addEventListener("click", ()=>{ openView("chat"); speakAck(T("tileChat")); });
 el.guideBtn.addEventListener("click", ()=>press("open_guide"));
 el.allFeaturesBtn.addEventListener("click", ()=>press("open_all"));
 el.guideSpeak.addEventListener("click", speakWholeGuide);

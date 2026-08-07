@@ -71,6 +71,7 @@ const tobj= (k)   => (typeof TO === "function") ? TO(k) : {};
 function show(id){
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   const v = $(id); if (v) v.classList.add("active");
+  document.body.classList.toggle("on-auth", !!(v && v.classList.contains("auth")));
 }
 function err(elId, msg){
   const e = $(elId); if(!e) return;
