@@ -36,7 +36,14 @@ FastAPI + MongoDB. Endpoints under `/api`:
 - `GET/PUT /api/settings` — user settings
 - `GET /api/health` — health check
 
-Run: `pip install -r backend/requirements.txt && uvicorn server:app --app-dir backend` (needs `MONGO_URL`, `EMERGENT_LLM_KEY` in `backend/.env`).
+Run:
+```bash
+cd backend
+cp .env.example .env        # fill in GEMINI_API_KEY (and MONGO_URL if not local)
+pip install -r requirements.txt
+uvicorn server:app --reload
+```
+YOLOv9 weights (`yolov9c.pt`) download automatically on first scene analysis.
 
 ## Mobile app (`frontend/`)
 

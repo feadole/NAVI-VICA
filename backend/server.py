@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import base64
 import io
 import tempfile
@@ -52,17 +52,10 @@ def get_yolo_model():
             raise HTTPException(status_code=500, detail="Failed to load object detection model")
     return yolo_model
 
-# Gemini AI Chat - lazy loading
-def get_ai_chat(session_id: str):
-    from emergentintegrations.llm.chat import LlmChat
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="AI API key not configured")
-    
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=session_id,
-        system_message="""You are NAVI-VICA, a friendly and helpful AI assistant designed to help elderly and disabled individuals navigate their environment safely. 
+# Gemini AI - lazy loading
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3-flash-preview')
+
+SYSTEM_PROMPT = """You are NAVI-VICA, a friendly and helpful AI assistant designed to help elderly and disabled individuals navigate their environment safely.
 
 Your role is to:
 1. Describe scenes in clear, simple language
@@ -72,19 +65,38 @@ Your role is to:
 5. Respond to voice commands helpfully
 
 Always be patient, clear, and reassuring. Use simple words and short sentences. When describing objects, mention their position (left, right, center, near, far). Prioritize safety warnings."""
+
+_genai_client = None
+
+def get_genai_client():
+    global _genai_client
+    if _genai_client is None:
+        from google import genai
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="AI API key not configured (set GEMINI_API_KEY)")
+        _genai_client = genai.Client(api_key=api_key)
+    return _genai_client
+
+async def ai_generate(prompt: str, image_base64: Optional[str] = None) -> str:
+    """Send a prompt (optionally with an image) to Gemini and return the reply text."""
+    from google.genai import types
+    client = get_genai_client()
+    contents = []
+    if image_base64:
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        contents.append(types.Part.from_bytes(
+            data=base64.b64decode(image_base64), mime_type="image/jpeg"))
+    contents.append(prompt)
+    response = await client.aio.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT),
     )
-    chat.with_model("gemini", "gemini-3-flash-preview")
-    return chat
+    return (response.text or "").strip()
 
 # ========== MODELS ==========
-
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
 class DetectionResult(BaseModel):
     class_name: str
@@ -103,7 +115,7 @@ class SceneAnalysisResponse(BaseModel):
     ai_description: str
     safety_warnings: List[str]
     navigation_hints: List[str]
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class VoiceCommandRequest(BaseModel):
     text: str
@@ -112,7 +124,7 @@ class VoiceCommandRequest(BaseModel):
 class VoiceCommandResponse(BaseModel):
     response_text: str
     action: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MedicationReminder(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -121,7 +133,7 @@ class MedicationReminder(BaseModel):
     minute: int
     repeat_daily: bool = True
     enabled: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MedicationReminderCreate(BaseModel):
     name: str
@@ -261,19 +273,7 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.model_dump())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @api_router.post("/analyze-scene", response_model=SceneAnalysisResponse)
 async def analyze_scene(request: SceneAnalysisRequest):
@@ -307,15 +307,8 @@ async def analyze_scene(request: SceneAnalysisRequest):
         # Get AI description using Gemini
         ai_description = "Scene analysis in progress..."
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-            
-            chat = get_ai_chat(f"scene_{uuid.uuid4()}")
-            
-            # Create image content for vision analysis - using file_contents not image_contents
-            image_content = ImageContent(image_base64=request.image_base64)
-            
             prompt = f"""Analyze this image for a {request.user_profile} assistance user.
-            
+
 Objects detected by computer vision:
 {chr(10).join(detection_summary) if detection_summary else "No specific objects detected"}
 
@@ -327,13 +320,8 @@ Please describe:
 3. Safe navigation suggestions
 Keep it concise and clear for voice reading."""
 
-            user_message = UserMessage(
-                text=prompt,
-                file_contents=[image_content]
-            )
-            
-            ai_description = await chat.send_message(user_message)
-            
+            ai_description = await ai_generate(prompt, image_base64=request.image_base64)
+
         except Exception as e:
             logger.error(f"AI description failed: {e}")
             # Fallback description based on detections
@@ -363,12 +351,8 @@ Keep it concise and clear for voice reading."""
 async def process_voice_command(request: VoiceCommandRequest):
     """Process a voice command and return a response"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
-        chat = get_ai_chat(f"voice_{uuid.uuid4()}")
-        
         prompt = f"""User voice command: "{request.text}"
-        
+
 Context: {request.context if request.context else "General assistance"}
 
 Respond naturally and helpfully. If the user is asking about their surroundings, remind them to use the camera feature. If asking about medications, mention the reminders feature.
@@ -377,8 +361,7 @@ Always reply in the same language the user wrote in.
 
 Keep response under 50 words for easy listening."""
 
-        user_message = UserMessage(text=prompt)
-        response_text = await chat.send_message(user_message)
+        response_text = await ai_generate(prompt)
         
         # Determine action based on command
         action = None
