@@ -95,6 +95,7 @@ class DetectionResult(BaseModel):
 class SceneAnalysisRequest(BaseModel):
     image_base64: str
     user_profile: Optional[str] = "general"  # mobility, vision, cognitive, health
+    confidence: Optional[float] = Field(default=0.20, ge=0.05, le=0.95)
 
 class SceneAnalysisResponse(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -166,22 +167,22 @@ def base64_to_image(base64_string: str) -> Image.Image:
     
     return image
 
-async def run_yolo_detection(image: Image.Image) -> tuple:
+async def run_yolo_detection(image: Image.Image, min_conf: float = 0.20) -> tuple:
     """Run YOLOv9 detection on image"""
     model = get_yolo_model()
-    
+
     # Save image temporarily
     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
         image.save(tmp.name, 'JPEG')
         tmp_path = tmp.name
-    
+
     try:
         # Run detection with better settings for accuracy
-        results = model(tmp_path, verbose=False, conf=0.20, imgsz=1280)
-        
+        results = model(tmp_path, verbose=False, conf=min_conf, imgsz=1280)
+
         detections = []
         img_width = image.width
-        
+
         for result in results:
             if result.boxes is not None:
                 for box in result.boxes:
@@ -189,8 +190,8 @@ async def run_yolo_detection(image: Image.Image) -> tuple:
                     conf = float(box.conf[0])
                     cls = int(box.cls[0])
                     class_name = model.names[cls]
-                    
-                    if conf > 0.20:  # Lower confidence threshold for more detections
+
+                    if conf >= min_conf:
                         detection = DetectionResult(
                             class_name=class_name,
                             confidence=round(conf, 2),
@@ -283,7 +284,7 @@ async def analyze_scene(request: SceneAnalysisRequest):
         logger.info(f"Processing image: {image.width}x{image.height}")
         
         # Run YOLOv9 detection
-        detections, img_width, img_height = await run_yolo_detection(image)
+        detections, img_width, img_height = await run_yolo_detection(image, request.confidence or 0.20)
         logger.info(f"Detected {len(detections)} objects")
         
         # Generate safety warnings and navigation hints
@@ -371,6 +372,8 @@ async def process_voice_command(request: VoiceCommandRequest):
 Context: {request.context if request.context else "General assistance"}
 
 Respond naturally and helpfully. If the user is asking about their surroundings, remind them to use the camera feature. If asking about medications, mention the reminders feature.
+
+Always reply in the same language the user wrote in.
 
 Keep response under 50 words for easy listening."""
 
