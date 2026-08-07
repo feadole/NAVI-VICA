@@ -20,7 +20,9 @@ Features:
 - **Care** — medication alarms & appointments, symptom/vitals log, health card, doctor summary export
 - **Safety** — SOS calls, location sharing, fall detection, scheduled check-ins, scam checker, panic button
 - **Accounts** — local-first accounts with optional Supabase cloud sync (see [`web/SETUP.md`](web/SETUP.md)); everything works offline and syncs when signal returns
-- **18 languages** (English & Russian complete, 16 voice-ready)
+- **18 full languages** — every language has complete UI text, chat replies, and native spoken command phrases (packs in [`web/lang/`](web/lang/), loaded on demand and cached for offline)
+- **Voice-first, always attentive** — wake-word listening resumes automatically after every command and across visits; say "VICA" any time. Natural system voices are chosen automatically, with a voice picker in Settings
+- **One-screen home** — mic, status, and the four main actions all visible without scrolling
 
 Configuration lives in [`web/config.js`](web/config.js):
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` — optional cloud accounts & sync

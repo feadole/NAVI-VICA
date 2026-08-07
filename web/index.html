@@ -217,8 +217,10 @@
 
     <nav class="grid-main" id="homeGrid" aria-label="Main actions"></nav>
 
-    <button class="big-tile guide-tile" id="guideBtn"><span class="ico">🎓</span><span id="guideBtnLabel"></span></button>
-    <button class="big-tile all-tile" id="allFeaturesBtn"><span class="ico">⋯</span><span id="allFeaturesLabel"></span></button>
+    <div class="home-foot">
+      <button class="big-tile guide-tile" id="guideBtn"><span class="ico">🎓</span><span id="guideBtnLabel"></span></button>
+      <button class="big-tile all-tile" id="allFeaturesBtn"><span class="ico">⋯</span><span id="allFeaturesLabel"></span></button>
+    </div>
   </div>
 </main>
 
@@ -380,6 +382,7 @@
 <div class="scroll">
   <div class="row"><label id="profileLabel" for="profileSelect"></label><select id="profileSelect" aria-label="Care profile"></select></div>
   <div class="row"><label id="rateLabel" for="rateRange"></label><input type="range" id="rateRange" min="60" max="130" step="5"><span class="val" id="rateVal"></span></div>
+  <div class="row"><label id="voiceLabel" for="voiceSelect"></label><select id="voiceSelect" aria-label="Voice"></select></div>
   <div class="row"><label id="hapticLabel" for="hapticToggle"></label><input type="checkbox" id="hapticToggle" class="switch"></div>
   <div class="row"><label id="spatialLabel" for="spatialToggle"></label><input type="checkbox" id="spatialToggle" class="switch"></div>
   <div class="row"><label id="checkinLabel" for="checkinSelect"></label><select id="checkinSelect">

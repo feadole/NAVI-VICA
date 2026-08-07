@@ -155,9 +155,43 @@ function chime(){ tone(523,0.5,0); setTimeout(()=>tone(659,0.6,0),260); buzz(HAP
 
 /* ---------- speech out ---------- */
 let voices = [];
-const loadVoices = () => { voices = speechSynthesis.getVoices(); };
+const loadVoices = () => { voices = speechSynthesis.getVoices(); populateVoicePicker(); };
 loadVoices();
 if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+
+/* Pick the most natural-sounding voice the device offers for a language.
+   Modern systems ship neural/natural voices — prefer those over the old
+   robotic defaults. A person can still override per language in Settings. */
+const VOICE_QUALITY = [/natural/i, /neural/i, /premium/i, /enhanced/i, /online/i, /google/i, /siri/i, /aria|jenny|guy|sonia|denise|katja|elvira|nanami|xiaoxiao|sunhi|swara|isabella|colette|sofie|zofia|polina|dilara|hamed|salma/i];
+function voicesFor(code){
+  const short = (code||"en").split("-")[0];
+  const exact = voices.filter(v=>v.lang===code || (v.lang||"").replace("_","-")===code);
+  const loose = voices.filter(v=>(v.lang||"").replace("_","-").startsWith(short) && !exact.includes(v));
+  return exact.concat(loose);
+}
+function bestVoice(code){
+  const cands = voicesFor(code);
+  if (!cands.length) return null;
+  const saved = GLS("nv.voice." + code.split("-")[0], "");
+  if (saved){ const v = cands.find(x=>x.name===saved); if (v) return v; }
+  for (const rx of VOICE_QUALITY){ const v = cands.find(x=>rx.test(x.name)); if (v) return v; }
+  return cands[0];
+}
+function populateVoicePicker(){
+  const sel = document.getElementById("voiceSelect");
+  if (!sel) return;
+  const code = (window.I18N && I18N[S.lang] && I18N[S.lang].tts) || "en-US";
+  const cands = voicesFor(code);
+  sel.innerHTML = "";
+  const chosen = bestVoice(code);
+  cands.forEach(v=>{
+    const o = document.createElement("option");
+    o.value = v.name; o.textContent = v.name.replace(/^(Microsoft|Google|Apple)\s*/,"");
+    if (chosen && v.name === chosen.name) o.selected = true;
+    sel.append(o);
+  });
+  sel.disabled = !cands.length;
+}
 
 let speaking = false, lastSpoken = "";
 function setMic(state){
@@ -169,8 +203,8 @@ function setMic(state){
 function utter(text, rate){
   const u = new SpeechSynthesisUtterance(text);
   const code = I18N[S.lang].tts || "en-US";
-  u.lang = code; u.rate = (rate||S.rate)/100;
-  const v = voices.find(x=>x.lang===code) || voices.find(x=>x.lang && x.lang.startsWith(code.split("-")[0]));
+  u.lang = code; u.rate = (rate||S.rate)/100; u.pitch = 1.02;
+  const v = bestVoice(code);
   if (v) u.voice = v;
   return u;
 }
@@ -204,7 +238,7 @@ function addBubble(who, text){
 /* ---------- listening: wake word + command ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, mode = "off", wantListen = false;
-const WAKE_RX = /(vica|vika|veeka|weka|viika|викк?а|вика|віка|фика)/i;
+const WAKE_RX = /(vica|vika|veeka|weka|viika|викк?а|вика|віка|фика|фіка|ヴィカ|ビカ|びか|维卡|薇卡|微卡|비카|वीका|विका|فيكا|ویکا|βίκα)/i;
 
 function killRec(){ if(!rec) return; try{ rec.onresult=rec.onend=rec.onerror=null; }catch(e){} try{ rec.abort(); }catch(e){} rec=null; }
 function pauseListening(){ if (mode==="cmd") return; killRec(); mode = wantListen ? "paused" : "off"; }
@@ -249,17 +283,23 @@ function startCommand(){
         if (e.results[i].isFinal) fin = e.results[i][0].transcript.trim();
       }
     };
-    rec.onerror = () => { setMic("idle"); mode="off"; };
+    rec.onerror = () => { setMic("idle"); mode="off"; keepListening(); };
     rec.onend = () => {
       clearTimeout(timer); setMic("idle"); mode = "off";
       if (fin){ addBubble("user", fin); handle(fin); }
       else { speak(T("didntCatch")); }
+      keepListening();
     };
     rec.start(); arm();
   }catch(e){ setMic("idle"); mode="off"; }
 }
+/* VICA never stops paying attention: after every command, reply or error
+   the wake-word ear comes back on its own (unless the mic was blocked). */
+function keepListening(){
+  setTimeout(()=>{ if (wantListen && !speaking && mode==="off" && !captionsOn) startWake(); }, 500);
+}
 function micTap(){
-  wantListen = true; ac();
+  wantListen = true; GSAVE("nv.listen","1"); ac();
   if (speaking){ speechSynthesis.cancel(); speaking = false; }
   if (mode === "cmd") return;
   startCommand();
@@ -1263,7 +1303,8 @@ const ACTIONS = {
   verbose_brief:  ()=> { S.verb="brief"; save("nv.verb","brief"); syncSettings(); speak(T("verbSet",{v:T("verbBrief")})); },
   verbose_detail: ()=> { S.verb="detailed"; save("nv.verb","detailed"); syncSettings(); speak(T("verbSet",{v:T("verbDetailed")})); },
   stop_everything:()=> { stopDetect(false); stopNav(false); if (captionsOn) stopCaptions();
-                         speechSynthesis.cancel(); speaking=false; speak(T("stopped")); }
+                         speechSynthesis.cancel(); speaking=false; speak(T("stopped")); },
+  listen_off:     ()=> { wantListen=false; GSAVE("nv.listen","0"); killRec(); mode="off"; setMic("idle"); speak(T("stopped")); }
 };
 
 /* A readable phrase for each action, so a tap produces the same
@@ -1313,6 +1354,7 @@ function matchSlotIntent(c){
 }
 /* ---- intent table: every phrase maps to an action in ACTIONS ---- */
 const INTENTS = [
+  ["listen_off",      /(stop listening|don'?t listen|go to sleep|перестань слушать|не слушай|усни)/],
   ["stop_everything", /^(stop|стоп|хватит|останови|прекрати|отмена)/],
   ["im_okay",        /(i'?m ok|i am ok|i'?m fine|all good|я в порядке|всё хорошо|все хорошо|я цел)/],
   ["sos",            /(help me|call for help|emergency|i'?ve fallen|помогите|спасите|вызови помощь|мне плохо срочно)/],
@@ -1357,6 +1399,11 @@ const INTENTS = [
 ];
 function matchIntent(c){
   for (const [action, rx] of INTENTS) if (rx.test(c)) return action;
+  /* language packs carry native spoken phrases for every action, so all
+     18 languages command the app exactly like English */
+  const kw = (I18N[S.lang] && I18N[S.lang].kw) || null;
+  if (kw) for (const [action, phrases] of Object.entries(kw))
+    for (const p of phrases) if (c.includes(p)) return action;
   return null;
 }
 
@@ -1414,8 +1461,9 @@ function handle(raw){
   if (/(say that again|repeat|what did you say|повтори|что ты сказала|ещё раз|еще раз)/.test(c)){ say(lastSpoken || T("repeatNone")); return; }
 
   /* language */
-  if (/(russian|по-русски|на русск|русский язык)/.test(c)){ setLang("ru"); return; }
-  if (/(english|по-английски|английск|на англ)/.test(c)){ setLang("en"); return; }
+  const langHit = matchLangSwitch(c);
+  if (langHit && langHit !== S.lang){ setLang(langHit); return; }
+  if (/(по-английски|на англ)/.test(c)){ setLang("en"); return; }
 
   /* speech settings */
   if (/(slower|speak slow|медленн)/.test(c)){ S.rate=Math.max(60,S.rate-15); save("nv.rate",S.rate); syncSettings(); say(T("slower")); return; }
@@ -1666,12 +1714,43 @@ function setProfile(p, announce){
   lastSaid = "";
   if (announce !== false) speak(TO("profileSet")[p]);
 }
+/* Full translation packs: en+ru live in i18n.js, every other language
+   loads its pack on demand so each one speaks, reads and obeys commands
+   exactly like English. */
+const PACKS = ["ar","de","es","fa","fr","hi","it","ja","ko","nl","pl","pt","sv","tr","uk","zh"];
+function loadLangPack(code, done){
+  if (!PACKS.includes(code) || (I18N[code] && I18N[code]._packed)){ if (done) done(); return; }
+  const s = document.createElement("script");
+  s.src = "lang/" + code + ".js";
+  s.onload = ()=>{ I18N[code]._packed = true; if (done) done(); };
+  s.onerror = ()=>{ if (done) done(); };
+  document.head.append(s);
+}
 function setLang(code, announce){
   if (!I18N[code]) return;
   S.lang = code; save("nv.lang", code);
-  applyLang();
-  if (announce !== false) speak(T("langChanged"));
-  if (mode === "wake") startWake();
+  loadLangPack(code, ()=>{
+    applyLang();
+    if (announce !== false) speak(T("langChanged"));
+    if (mode === "wake") startWake();
+  });
+}
+/* every language can be asked for by name, in that language or English */
+const LANG_NAMES = {
+  en:["english"], ru:["russian","русск","по-русски"], tr:["turkish","türkçe","turkce"],
+  ar:["arabic","العربية","عربي"], fr:["french","français","francais"], de:["german","deutsch"],
+  es:["spanish","español","espanol"], pt:["portuguese","português","portugues"],
+  zh:["chinese","中文","汉语","普通话"], ja:["japanese","日本語","にほんご"], ko:["korean","한국어"],
+  hi:["hindi","हिन्दी","हिंदी"], it:["italian","italiano"], nl:["dutch","nederlands"],
+  sv:["swedish","svenska"], pl:["polish","polski","po polsku"], uk:["ukrainian","українськ","украинск"],
+  fa:["farsi","persian","فارسی"]
+};
+function matchLangSwitch(c){
+  const wantsSwitch = /(speak|talk|switch|language|говори|перейди|язык|мова|parle|sprich|habla|parla|fala|说|話して|말해|बोलो|spreek|prata|mów|розмовляй|حرف بزن|تكلم)/.test(c);
+  for (const [code, names] of Object.entries(LANG_NAMES))
+    for (const n of names)
+      if (c.includes(n) && (wantsSwitch || c.length < 26)) return code;
+  return null;
 }
 function buildGreeting(){
   const h = new Date().getHours();
@@ -1716,6 +1795,8 @@ function applyLang(){
   el.mcAllergy.placeholder=T("mcAllergyPh"); el.mcBlood.placeholder=T("mcBloodPh");
   set("mcSaveLabel","mcSaveLabel"); set("logTitle","logTitle"); set("logExportLabel","logExportLabel");
   set("setTitle","setTitle"); set("rateLabel","rateLabel"); set("hapticLabel","hapticLabel");
+  const vl = document.getElementById("voiceLabel"); if (vl) vl.textContent = T("voiceLabel");
+  populateVoicePicker();
   set("spatialLabel","spatialLabel"); set("checkinLabel","checkinLabel"); set("battLabel","battLabel");
   set("caregiverTitle","caregiverTitle"); set("caregiverNote","caregiverNote");
   set("cfgExportLabel","cfgExportLabel"); set("cfgImportLabel","cfgImportLabel"); set("panicLabel","panicLabel");
@@ -1946,6 +2027,12 @@ function goHomeAddress(){
   }
 })();
 el.langSelect.addEventListener("change", ()=>setLang(el.langSelect.value));
+const voiceSel = document.getElementById("voiceSelect");
+if (voiceSel) voiceSel.addEventListener("change", ()=>{
+  const code = (I18N[S.lang].tts || "en-US").split("-")[0];
+  GSAVE("nv.voice." + code, voiceSel.value);
+  speak(T("voiceSet"));
+});
 el.profileSelect.addEventListener("change", ()=>setProfile(el.profileSelect.value));
 el.acctBtn.addEventListener("click", ()=>press("open_account"));
 el.guideBtn.addEventListener("click", ()=>press("open_guide"));
@@ -1954,6 +2041,15 @@ el.guideSpeak.addEventListener("click", speakWholeGuide);
 el.guidePractice.addEventListener("click", ()=>{ openView("help"); setRehearse(true); });
 
 loadS(); applyLang(); applyScale(); syncSettings(); setMic("idle");
+/* the active language's full pack loads immediately, then texts refresh */
+loadLangPack(S.lang, ()=>{ applyLang(); });
+/* VICA remembers she was listening: resume the wake-word ear on return.
+   (Speech output still needs one tap — browsers require it — so the mic
+   comes back silently and the first reply follows the first touch.) */
+if (GLS("nv.listen","") === "1" && SR){
+  wantListen = true;
+  setTimeout(()=>{ if (mode === "off") startWake(); }, 800);
+}
 
 window.addEventListener("load", ()=>{ setTimeout(()=>{ if (window.AUTH) AUTH.start(); }, 300); });
 document.body.addEventListener("pointerdown", function once(){ ac(); document.body.removeEventListener("pointerdown", once); });

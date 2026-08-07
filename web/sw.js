@@ -1,7 +1,10 @@
-const CACHE = "navi-vica-v11";
+const CACHE = "navi-vica-v12";
+const LANGS = ["ar","de","es","fa","fr","hi","it","ja","ko","nl","pl","pt","sv","tr","uk","zh"];
 const SHELL = ["./","index.html","styles.css","app.js","auth.js","cloud.js","sync.js","config.js","i18n.js","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png"];
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c =>
+    c.addAll(SHELL).then(() => Promise.allSettled(LANGS.map(l => c.add("lang/" + l + ".js"))))
+  ).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
