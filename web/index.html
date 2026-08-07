@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NAVI-VICA — Care Companion</title>
+<meta name="description" content="NAVI-VICA: voice-first care companion for elderly and disabled users. On-device YOLOv9 detection, navigation, reading, reminders, SOS.">
+<meta name="theme-color" content="#0F5B54">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">NAVI·VICA</div>
+  <div class="top-controls">
+    <select id="langSelect" aria-label="Language"></select>
+    <button id="acctBtn" class="acct-btn" aria-label="Account" hidden>👤</button>
+  </div>
+</header>
+
+<!-- ============ AUTH: LANDING ============ -->
+<section id="landing" class="view auth" aria-label="Welcome">
+  <div class="scroll auth-scroll">
+    <div class="auth-card hero">
+      <div class="auth-logo">NAVI·VICA</div>
+      <p id="hTagline" class="auth-tag"></p>
+      <ul class="hero-list" id="heroList"></ul>
+      <button id="goSignup" class="btn primary big full">✨ <span id="goSignupLabel"></span></button>
+      <button id="goSignin" class="btn ghost big full">→ <span id="goSigninLabel"></span></button>
+      <p class="cloud-note"></p>
+      <p class="fineprint" id="privacyNote"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUTH: SIGN UP ============ -->
+<section id="signup" class="view auth" aria-label="Create account">
+  <div class="scroll auth-scroll">
+    <div class="auth-card">
+      <div class="auth-head">
+        <button id="suBack" class="mini-back" aria-label="Back">‹</button>
+        <div class="auth-logo sm">NAVI·VICA</div>
+      </div>
+      <div class="steps" id="suDots"></div>
+      <h2 id="suTitle"></h2>
+      <p id="suHint" class="note"></p>
+
+      <!-- 1 name -->
+      <div class="wstep" data-step="1">
+        <label class="fl" id="lbName"></label>
+        <input id="suName" class="field full big-field" type="text" autocomplete="name">
+      </div>
+
+      <!-- 2 email / phone -->
+      <div class="wstep" data-step="2" hidden>
+        <label class="fl" id="lbEmail"></label>
+        <input id="suEmail" class="field full" type="email" autocomplete="email" inputmode="email">
+        <label class="fl" id="lbPhone"></label>
+        <input id="suPhone" class="field full" type="tel" autocomplete="tel" inputmode="tel">
+        <p class="note" id="suContactNote"></p>
+      </div>
+
+      <!-- 3 password -->
+      <div class="wstep" data-step="3" hidden>
+        <label class="fl" id="lbPw"></label>
+        <div class="pw-wrap">
+          <input id="suPw" class="field full" type="password" autocomplete="new-password">
+          <button type="button" class="pw-eye" data-eye="suPw" aria-label="Show password">👁</button>
+        </div>
+        <div class="pw-meter"><span id="pwBar"></span></div>
+        <label class="fl" id="lbPw2"></label>
+        <div class="pw-wrap">
+          <input id="suPw2" class="field full" type="password" autocomplete="new-password">
+          <button type="button" class="pw-eye" data-eye="suPw2" aria-label="Show password">👁</button>
+        </div>
+      </div>
+
+      <!-- 4 security questions -->
+      <div class="wstep" data-step="4" hidden>
+        <label class="fl" id="lbQ1"></label>
+        <select id="suQ1" class="field full"></select>
+        <input id="suA1" class="field full" type="text" autocomplete="off">
+        <label class="fl" id="lbQ2"></label>
+        <select id="suQ2" class="field full"></select>
+        <input id="suA2" class="field full" type="text" autocomplete="off">
+      </div>
+
+      <!-- 5 conditions -->
+      <div class="wstep" data-step="5" hidden>
+        <div id="suCondGrid" class="cond-grid"></div>
+      </div>
+
+      <!-- 6 details -->
+      <div class="wstep" data-step="6" hidden>
+        <label class="fl" id="lbDob"></label>
+        <input id="suDob" class="field full" type="date">
+        <label class="fl" id="lbHome"></label>
+        <input id="suHome" class="field full" type="text" autocomplete="street-address">
+        <label class="fl" id="lbBlood"></label>
+        <input id="suBlood" class="field full" type="text">
+        <label class="fl" id="lbAllergy"></label>
+        <input id="suAllergy" class="field full" type="text">
+        <label class="fl" id="lbMeds"></label>
+        <input id="suMeds" class="field full" type="text">
+      </div>
+
+      <!-- 7 emergency contact -->
+      <div class="wstep" data-step="7" hidden>
+        <label class="fl" id="lbEcName"></label>
+        <input id="suEcName" class="field full" type="text">
+        <label class="fl" id="lbEcPhone"></label>
+        <input id="suEcPhone" class="field full" type="tel" inputmode="tel">
+        <label class="fl" id="lbEcRel"></label>
+        <input id="suEcRel" class="field full" type="text">
+      </div>
+
+      <p class="err" id="suErr" hidden></p>
+      <button id="suNext" class="btn primary big full">→ <span id="suNextLabel"></span></button>
+      <button id="suSkip" class="linkbtn" hidden></button>
+      <button id="suToSignin" class="linkbtn"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUTH: SIGN IN ============ -->
+<section id="signin" class="view auth" aria-label="Sign in">
+  <div class="scroll auth-scroll">
+    <div class="auth-card">
+      <div class="auth-head">
+        <button id="siBack" class="mini-back" aria-label="Back">‹</button>
+        <div class="auth-logo sm">NAVI·VICA</div>
+      </div>
+      <h2 id="siTitle"></h2>
+      <p id="siHint" class="note"></p>
+      <div id="siQuick" class="acct-list"></div>
+      <label class="fl" id="lbSiId"></label>
+      <input id="siId" class="field full" type="text" autocomplete="username" inputmode="email">
+      <label class="fl" id="lbSiPw"></label>
+      <div class="pw-wrap">
+        <input id="siPw" class="field full" type="password" autocomplete="current-password">
+        <button type="button" class="pw-eye" data-eye="siPw" aria-label="Show password">👁</button>
+      </div>
+      <label class="remember"><input type="checkbox" id="siRemember" checked><span id="lbRemember"></span></label>
+      <p class="err" id="siErr" hidden></p>
+      <button id="siGo" class="btn primary big full">→ <span id="siGoLabel"></span></button>
+      <button id="siForgot" class="linkbtn"></button>
+      <button id="siToSignup" class="linkbtn"></button>
+      <p class="cloud-note"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUTH: FORGOT PASSWORD ============ -->
+<section id="forgot" class="view auth" aria-label="Reset password">
+  <div class="scroll auth-scroll">
+    <div class="auth-card">
+      <div class="auth-head">
+        <button id="fgBack" class="mini-back" aria-label="Back">‹</button>
+        <div class="auth-logo sm">NAVI·VICA</div>
+      </div>
+      <h2 id="fgTitle"></h2>
+
+      <div class="wstep" data-fstep="1">
+        <p id="fgHint1" class="note"></p>
+        <label class="fl" id="lbFgId"></label>
+        <input id="fgId" class="field full" type="text" inputmode="email">
+      </div>
+
+      <div class="wstep" data-fstep="2" hidden>
+        <p id="fgHint2" class="note"></p>
+        <label class="fl" id="fgQ1Label"></label>
+        <input id="fgA1" class="field full" type="text" autocomplete="off">
+        <label class="fl" id="fgQ2Label"></label>
+        <input id="fgA2" class="field full" type="text" autocomplete="off">
+      </div>
+
+      <div class="wstep" data-fstep="3" hidden>
+        <p id="fgHint3" class="note"></p>
+        <label class="fl" id="lbFgPw"></label>
+        <div class="pw-wrap">
+          <input id="fgPw" class="field full" type="password" autocomplete="new-password">
+          <button type="button" class="pw-eye" data-eye="fgPw" aria-label="Show password">👁</button>
+        </div>
+        <label class="fl" id="lbFgPw2"></label>
+        <div class="pw-wrap">
+          <input id="fgPw2" class="field full" type="password" autocomplete="new-password">
+          <button type="button" class="pw-eye" data-eye="fgPw2" aria-label="Show password">👁</button>
+        </div>
+      </div>
+
+      <p class="sent" id="fgSent" hidden></p>
+      <p class="err" id="fgErr" hidden></p>
+      <button id="fgNext" class="btn primary big full">→ <span id="fgNextLabel"></span></button>
+      <button id="fgToSignin" class="linkbtn"></button>
+    </div>
+  </div>
+</section>
+
+<main id="home" class="view">
+  <div class="scroll">
+    <section class="greet-card"><p id="greetText"></p></section>
+
+    <section class="orient-card" id="orientCard" hidden><p id="orientText"></p></section>
+
+    <section class="mic-zone">
+      <button id="micBtn" class="mic idle" aria-label="Talk to VICA">🎙</button>
+      <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText"></span></div>
+      <div class="live-line" id="liveLine" role="status" aria-live="polite"></div>
+    </section>
+
+    <div class="aac-strip" id="aacStrip" hidden></div>
+
+    <nav class="grid-main" id="homeGrid" aria-label="Main actions"></nav>
+
+    <button class="big-tile guide-tile" id="guideBtn"><span class="ico">🎓</span><span id="guideBtnLabel"></span></button>
+    <button class="big-tile all-tile" id="allFeaturesBtn"><span class="ico">⋯</span><span id="allFeaturesLabel"></span></button>
+  </div>
+</main>
+
+<!-- ============ HOW TO USE (profile-aware) ============ -->
+<section id="guide" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="guideTitle"></h2></div>
+<div class="scroll">
+  <p class="guide-intro" id="guideIntro"></p>
+  <div id="guideList" class="guide-list"></div>
+  <div class="btn-row">
+    <button id="guideSpeak" class="btn primary big">🔊 <span id="guideSpeakLabel"></span></button>
+    <button id="guidePractice" class="btn secondary big">🎓 <span id="guidePracticeLabel"></span></button>
+  </div>
+</div></section>
+
+<!-- ============ ALL FEATURES ============ -->
+<section id="allfeatures" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="allTitle"></h2></div>
+<div class="scroll"><nav class="grid-sub" id="allGrid" aria-label="All features"></nav></div></section>
+
+<!-- ============ DETECT ============ -->
+<section id="detect" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="detTitle"></h2></div>
+<div class="scroll">
+  <div class="cam-wrap">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="cam-idle" id="camIdle"><div class="eye"><span></span></div></div>
+    <span class="badge" id="profileBadge"></span>
+    <button id="torchBtn" class="torch" hidden>🔦</button>
+  </div>
+  <div class="btn-row">
+    <button id="detBtn" class="btn primary big">👁 <span id="detBtnLabel"></span></button>
+    <button id="detStop" class="btn danger big" hidden>■ <span id="detStopLabel"></span></button>
+  </div>
+  <div class="result" id="detResult" role="status" aria-live="polite"></div>
+  <div class="row"><label id="confLabel" for="confRange"></label><input type="range" id="confRange" min="20" max="80" step="5"><span class="val" id="confVal"></span></div>
+  <div class="row"><label id="verbLabel" for="verbSelect"></label><select id="verbSelect"><option value="brief"></option><option value="detailed"></option></select></div>
+  <div class="row"><label id="modelLabel" for="modelSelect"></label><select id="modelSelect">
+    <option value="t">YOLOv9-T · 9 MB</option><option value="s">YOLOv9-S · 28 MB</option><option value="c">YOLOv9-C · 102 MB</option></select></div>
+</div></section>
+
+<!-- ============ NAVIGATE ============ -->
+<section id="nav" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="navTitle"></h2></div>
+<div class="scroll">
+  <div class="inline"><input id="navQuery" class="field grow" type="text"><button id="navGo" class="btn primary" aria-label="Search">🔎</button></div>
+  <div class="chips" id="navChips"></div>
+  <div id="map"></div>
+  <div class="result" id="navInfo"></div>
+  <div class="btn-row">
+    <a id="gmapsLink" class="btn secondary big" target="_blank" rel="noopener" hidden>🗺 Google Maps</a>
+    <a id="ymapsLink" class="btn secondary big" target="_blank" rel="noopener" hidden>🗺 Yandex Maps</a>
+  </div>
+  <div class="btn-row"><button id="navStop" class="btn danger big" hidden>■ <span id="navStopLabel"></span></button></div>
+</div></section>
+
+<!-- ============ ALARMS ============ -->
+<section id="alarms" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="alarmTitle"></h2></div>
+<div class="scroll">
+  <div class="inline wrap">
+    <input type="time" id="alarmTime" class="field">
+    <input type="text" id="alarmLabel" class="field grow">
+    <button id="alarmAdd" class="btn primary big">＋ <span id="alarmAddLabel"></span></button>
+  </div>
+  <div id="alarmList" class="list"></div>
+  <h3 id="apptTitle"></h3>
+  <div class="inline wrap">
+    <input type="datetime-local" id="apptTime" class="field">
+    <input type="text" id="apptLabel" class="field grow">
+    <button id="apptAdd" class="btn secondary big">＋</button>
+  </div>
+  <div id="apptList" class="list"></div>
+</div></section>
+
+<!-- ============ SOS ============ -->
+<section id="sos" class="view panel sos-panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="sosTitle"></h2></div>
+<div class="scroll">
+  <a id="sosCall" class="btn danger big full" href="tel:112">📞 <span id="sosCallLabel"></span></a>
+  <div class="btn-row">
+    <a id="ambCall" class="btn danger big" href="tel:103">🚑 <span id="ambLabel"></span></a>
+    <button id="shareLoc" class="btn secondary big">📍 <span id="shareLocLabel"></span></button>
+  </div>
+  <div id="sosList" class="list"></div>
+  <div class="inline wrap">
+    <input type="text" id="sosName" class="field grow"><input type="tel" id="sosPhone" class="field grow">
+    <button id="sosAdd" class="btn secondary big">＋ <span id="sosAddLabel"></span></button>
+  </div>
+  <h3 id="fallTitle"></h3>
+  <div class="row"><label id="fallLabel" for="fallToggle"></label><input type="checkbox" id="fallToggle" class="switch"></div>
+  <p class="note" id="fallNote"></p>
+</div></section>
+
+<!-- ============ CHAT ============ -->
+<section id="chat" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="chatTitle"></h2></div>
+<div class="scroll chat-scroll"><div id="chatLog" class="chat-log"></div></div>
+<div class="chat-bar"><input id="chatInput" class="field grow" type="text" autocomplete="off"><button id="chatSend" class="btn primary" aria-label="Send">➤</button></div>
+</section>
+
+<!-- ============ READ (OCR) ============ -->
+<section id="read" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="readTitle"></h2></div>
+<div class="scroll">
+  <p class="note" id="readHint"></p>
+  <div class="cam-wrap"><video id="readVideo" playsinline muted></video><div class="cam-idle" id="readIdle"><div class="eye"><span></span></div></div></div>
+  <div class="btn-row">
+    <button id="readStart" class="btn primary big">📷 <span id="readStartLabel"></span></button>
+    <button id="readShot" class="btn secondary big" hidden>📖 <span id="readShotLabel"></span></button>
+  </div>
+  <div class="result" id="readResult" role="status" aria-live="polite"></div>
+</div></section>
+
+<!-- ============ FIND ITEMS ============ -->
+<section id="find" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="findTitle"></h2></div>
+<div class="scroll"><p class="note" id="findHint"></p><div id="findList" class="list"></div></div></section>
+
+<!-- ============ CAPTIONS ============ -->
+<section id="captions" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="capTitle"></h2></div>
+<div class="scroll">
+  <p class="note" id="capHint"></p>
+  <div class="btn-row"><button id="capStart" class="btn primary big">👂 <span id="capStartLabel"></span></button><button id="capStop" class="btn danger big" hidden>■ <span id="capStopLabel"></span></button></div>
+  <div class="caption-box" id="capBox" aria-live="polite"></div>
+</div></section>
+
+<!-- ============ NOTES ============ -->
+<section id="notes" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="notesTitle"></h2></div>
+<div class="scroll">
+  <div class="inline"><input id="noteInput" class="field grow" type="text"><button id="noteAdd" class="btn primary" aria-label="Add">＋</button></div>
+  <div class="btn-row"><button id="noteSpeak" class="btn secondary big">🎙 <span id="noteSpeakLabel"></span></button></div>
+  <div id="noteList" class="list"></div>
+</div></section>
+
+<!-- ============ SERVICES (cab, food, help) ============ -->
+<section id="services" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="svcTitle"></h2></div>
+<div class="scroll">
+  <h3 id="cabTitle"></h3>
+  <div class="btn-row"><a id="cabYandex" class="btn primary big" target="_blank" rel="noopener">🚕 Yandex Go</a><a id="cabUber" class="btn primary big" target="_blank" rel="noopener">🚕 Uber</a></div>
+  <p class="note" id="cabNote"></p>
+  <h3 id="foodTitle"></h3>
+  <div class="btn-row"><a id="foodYandex" class="btn secondary big" target="_blank" rel="noopener">🍲 Yandex Eda</a><a id="foodUber" class="btn secondary big" target="_blank" rel="noopener">🍔 Uber Eats</a></div>
+  <h3 id="pharmTitle"></h3>
+  <div class="btn-row"><button id="pharmFind" class="btn primary big">💊 <span id="pharmFindLabel"></span></button></div>
+  <h3 id="scamTitle"></h3>
+  <div class="inline"><input id="scamInput" class="field grow" type="text"><button id="scamCheck" class="btn danger" aria-label="Check">🛡</button></div>
+  <div class="result" id="scamResult"></div>
+</div></section>
+
+<!-- ============ HEALTH CARD ============ -->
+<section id="health" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="healthTitle"></h2></div>
+<div class="scroll">
+  <div class="med-card" id="medCard"></div>
+  <div class="btn-row"><button id="medSpeak" class="btn primary big">🔊 <span id="medSpeakLabel"></span></button></div>
+  <h3 id="medEditTitle"></h3>
+  <input id="mcName" class="field full" type="text"><input id="mcCond" class="field full" type="text">
+  <input id="mcAllergy" class="field full" type="text"><input id="mcBlood" class="field full" type="text">
+  <button id="mcSave" class="btn secondary big full">💾 <span id="mcSaveLabel"></span></button>
+  <h3 id="logTitle"></h3>
+  <div class="result" id="logSummary"></div>
+  <div class="btn-row"><button id="logExport" class="btn secondary big">📤 <span id="logExportLabel"></span></button></div>
+</div></section>
+
+<!-- ============ SETTINGS ============ -->
+<section id="settings" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="setTitle"></h2></div>
+<div class="scroll">
+  <div class="row"><label id="profileLabel" for="profileSelect"></label><select id="profileSelect" aria-label="Care profile"></select></div>
+  <div class="row"><label id="rateLabel" for="rateRange"></label><input type="range" id="rateRange" min="60" max="130" step="5"><span class="val" id="rateVal"></span></div>
+  <div class="row"><label id="hapticLabel" for="hapticToggle"></label><input type="checkbox" id="hapticToggle" class="switch"></div>
+  <div class="row"><label id="spatialLabel" for="spatialToggle"></label><input type="checkbox" id="spatialToggle" class="switch"></div>
+  <div class="row"><label id="checkinLabel" for="checkinSelect"></label><select id="checkinSelect">
+    <option value="0"></option><option value="4"></option><option value="8"></option><option value="12"></option></select></div>
+  <div class="row"><label id="battLabel"></label><span class="val" id="battVal">—</span></div>
+  <h3 id="caregiverTitle"></h3>
+  <p class="note" id="caregiverNote"></p>
+  <div class="btn-row"><button id="cfgExport" class="btn secondary big">📤 <span id="cfgExportLabel"></span></button><button id="cfgImport" class="btn secondary big">📥 <span id="cfgImportLabel"></span></button></div>
+  <div class="btn-row"><button id="panicBtn" class="btn danger big full">🟥 <span id="panicLabel"></span></button></div>
+</div></section>
+
+<!-- ============ HELP / REHEARSAL ============ -->
+<section id="help" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="helpTitle"></h2></div>
+<div class="scroll">
+  <div class="btn-row"><button id="rehearseBtn" class="btn primary big">🎓 <span id="rehearseLabel"></span></button></div>
+  <div class="result" id="rehearseBox"></div>
+  <div id="helpList" class="list"></div>
+</div></section>
+
+<!-- ============ MY ACCOUNT ============ -->
+<section id="account" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="acTitle"></h2></div>
+<div class="scroll">
+  <div class="acct-hero"><span class="av-big" id="acAvatar">🙂</span><div><div class="acct-name" id="acName"></div><div class="acct-sub" id="acContact"></div></div></div>
+
+  <h3 id="acDetailsTitle"></h3>
+  <label class="fl" id="lbAcName"></label><input id="acFName" class="field full" type="text">
+  <label class="fl" id="lbAcEmail"></label><input id="acEmail" class="field full" type="email" inputmode="email">
+  <label class="fl" id="lbAcPhone"></label><input id="acPhone" class="field full" type="tel" inputmode="tel">
+  <label class="fl" id="lbAcDob"></label><input id="acDob" class="field full" type="date">
+  <label class="fl" id="lbAcHome"></label><input id="acHome" class="field full" type="text">
+  <button id="acSave" class="btn primary big full">💾 <span id="acSaveLabel"></span></button>
+
+  <h3 id="acCondTitle"></h3>
+  <p class="note" id="acCondHint"></p>
+  <div id="acCondGrid" class="cond-grid"></div>
+  <button id="acCondSave" class="btn secondary big full">✓ <span id="acCondSaveLabel"></span></button>
+
+  <h3 id="acEcTitle"></h3>
+  <label class="fl" id="lbAcEcName"></label><input id="acEcName" class="field full" type="text">
+  <label class="fl" id="lbAcEcPhone"></label><input id="acEcPhone" class="field full" type="tel" inputmode="tel">
+  <button id="acEcSave" class="btn secondary big full">💾 <span id="acEcSaveLabel"></span></button>
+
+  <h3 id="acPwTitle"></h3>
+  <label class="fl" id="lbAcOldPw"></label>
+  <div class="pw-wrap"><input id="acOldPw" class="field full" type="password"><button type="button" class="pw-eye" data-eye="acOldPw">👁</button></div>
+  <label class="fl" id="lbAcNewPw"></label>
+  <div class="pw-wrap"><input id="acNewPw" class="field full" type="password"><button type="button" class="pw-eye" data-eye="acNewPw">👁</button></div>
+  <p class="err" id="acErr" hidden></p>
+  <button id="acPwSave" class="btn secondary big full">🔒 <span id="acPwSaveLabel"></span></button>
+
+  <h3 id="acCloudTitle"></h3>
+  <div id="acCloudStatus" class="cloud-badge"></div>
+  <div class="btn-row"><button id="acSyncNow" class="btn primary big" hidden>☁️ <span id="acSyncNowLabel"></span></button></div>
+  <h3 id="acTransferTitle"></h3>
+  <p class="note" id="acTransferNote"></p>
+  <div class="btn-row">
+    <button id="acExport" class="btn secondary big">📤 <span id="acExportLabel"></span></button>
+    <button id="acImport" class="btn secondary big">📥 <span id="acImportLabel"></span></button>
+  </div>
+
+  <div class="btn-row">
+    <button id="acSignout" class="btn primary big full">🚪 <span id="acSignoutLabel"></span></button>
+  </div>
+  <button id="acDelete" class="btn danger big full">🗑 <span id="acDeleteLabel"></span></button>
+</div></section>
+
+<!-- ============ SYMPTOMS / VITALS ============ -->
+<section id="symptoms" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="symTitle"></h2></div>
+<div class="scroll">
+  <p class="note" id="symHint"></p>
+  <div class="chips" id="symChips"></div>
+  <div class="inline wrap">
+    <input id="vitalName" class="field grow" type="text">
+    <input id="vitalVal" class="field" type="text">
+    <button id="vitalAdd" class="btn primary big">＋ <span id="vitalAddLabel"></span></button>
+  </div>
+  <div id="symList" class="list"></div>
+</div></section>
+
+<!-- ============ FLASH ALERT (for hearing loss) ============ -->
+<div id="flash" class="flash" hidden></div>
+
+<!-- ============ PANIC OVERLAY ============ -->
+<div id="panic" class="panic" hidden>
+  <p id="panicText"></p>
+  <a id="panicCall" class="panic-call" href="tel:112">📞</a>
+  <button id="panicClose" class="panic-close" aria-label="Close">✕</button>
+</div>
+
+<!-- ============ BOTTOM BAR (never overlaps content) ============ -->
+<nav class="bottombar" aria-label="Quick bar">
+  <button id="barHome" class="bar-btn"><span class="ico">🏠</span><span id="barHomeLabel"></span></button>
+  <button id="barMic" class="bar-mic idle" aria-label="Talk to VICA">🎙</button>
+  <button id="barRepeat" class="bar-btn"><span class="ico">🔁</span><span id="barRepeatLabel"></span></button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="cloud.js"></script>
+<script src="sync.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>
