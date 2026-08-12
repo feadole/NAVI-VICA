@@ -335,3 +335,18 @@ body{background:linear-gradient(165deg,#0A3B35 0%,#0E5A50 42%,#17836F 100%)}
 /* welcome cards breathe on the gradient */
 .auth-card{border:none}
 .auth-logo{color:var(--teal)}
+
+/* ================================================================
+   PROFESSIONAL ICONS — crisp strokes everywhere emoji used to be
+   ================================================================ */
+svg.ico, svg.svgi{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tile svg.ico{width:clamp(1.6rem,5.2dvh,2.6rem);height:clamp(1.6rem,5.2dvh,2.6rem)}
+.mini svg.ico{width:1.5rem;height:1.5rem}
+.bar-btn svg.ico{width:1.5rem;height:1.5rem}
+.big-tile svg.ico{width:1.5rem;height:1.5rem}
+.mic svg.svgi{width:46%;height:46%}
+.bar-mic svg.svgi{width:50%;height:50%}
+.float-btn svg.svgi{width:48%;height:48%}
+.acct-btn svg.svgi{width:1.4rem;height:1.4rem}
+.mic,.bar-mic,.float-btn{display:inline-flex;align-items:center;justify-content:center}
+.acct-btn{display:inline-flex;align-items:center;justify-content:center}

@@ -84,13 +84,15 @@ guideBtn guideBtnLabel guideTitle guideIntro guideList guideSpeak guideSpeakLabe
 
 /* catalogue of every feature tile (icon + i18n label key + target view) */
 const FEATURES = {
-  detect:{ico:"👁",k:"tileDetect",cls:"t-detect"}, nav:{ico:"🧭",k:"tileNav",cls:"t-nav"},
-  alarms:{ico:"⏰",k:"tileAlarms",cls:"t-alarm"}, sos:{ico:"🆘",k:"tileSos",cls:"t-sos"},
-  chat:{ico:"💬",k:"tileChat"}, read:{ico:"📖",k:"tileRead"}, find:{ico:"🔍",k:"tileFind"},
-  captions:{ico:"👂",k:"tileCaptions"}, notes:{ico:"📝",k:"tileNotes"}, services:{ico:"🚕",k:"tileServices"},
-  health:{ico:"❤️",k:"tileHealth"}, symptoms:{ico:"🩺",k:"symTitle"}, settings:{ico:"⚙️",k:"tileSettings"},
-  help:{ico:"🎓",k:"tileHelp"}
+  detect:{ico:"i-eye",k:"tileDetect",cls:"t-detect"}, nav:{ico:"i-nav",k:"tileNav",cls:"t-nav"},
+  alarms:{ico:"i-bell",k:"tileAlarms",cls:"t-alarm"}, sos:{ico:"i-sos",k:"tileSos",cls:"t-sos"},
+  chat:{ico:"i-chat",k:"tileChat"}, read:{ico:"i-read",k:"tileRead"}, find:{ico:"i-find",k:"tileFind"},
+  captions:{ico:"i-ear",k:"tileCaptions"}, notes:{ico:"i-note",k:"tileNotes"}, services:{ico:"i-car",k:"tileServices"},
+  health:{ico:"i-heart",k:"tileHealth"}, symptoms:{ico:"i-pulse",k:"symTitle"}, settings:{ico:"i-gear",k:"tileSettings"},
+  help:{ico:"i-grad",k:"tileHelp"}
 };
+/* headings speak plainly — decorative emoji are stripped from visible chrome */
+const deEmoji = (s) => String(s||"").replace(/^(?:\p{Extended_Pictographic}️?\s*)+/gu, "");
 /* which tiles lead each condition's home (kept short & simple) */
 const HOME_FOR = {
   vision:["detect","read","nav","sos"],
@@ -167,7 +169,9 @@ if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschang
 /* Pick the most natural-sounding voice the device offers for a language.
    Modern systems ship neural/natural voices — prefer those over the old
    robotic defaults. A person can still override per language in Settings. */
-const VOICE_QUALITY = [/natural/i, /neural/i, /premium/i, /enhanced/i, /online/i, /google/i, /siri/i, /aria|jenny|guy|sonia|denise|katja|elvira|nanami|xiaoxiao|sunhi|swara|isabella|colette|sofie|zofia|polina|dilara|hamed|salma/i];
+const VOICE_QUALITY = [/natural/i, /neural/i, /premium/i, /enhanced/i, /online/i, /google/i, /siri/i,
+  /ava|zoe|nathan|evan|allison|susan|joelle|karen|daniel|moira|tessa|martha|arthur/i,
+  /aria|jenny|guy|sonia|denise|katja|elvira|nanami|xiaoxiao|sunhi|swara|isabella|colette|sofie|zofia|polina|dilara|hamed|salma/i];
 function voicesFor(code){
   const short = (code||"en").split("-")[0];
   const exact = voices.filter(v=>v.lang===code || (v.lang||"").replace("_","-")===code);
@@ -1907,7 +1911,7 @@ function applyLang(){
   document.documentElement.lang = S.lang;
   document.documentElement.dir = (S.lang==="ar"||S.lang==="fa") ? "rtl" : "ltr";
   el.langSelect.value = S.lang;
-  const set = (id,k)=>{ if (el[id]) el[id].textContent = T(k); };
+  const set = (id,k)=>{ if (el[id]) el[id].textContent = deEmoji(T(k)); };
   set("statusText","statusIdle");
   set("barHomeLabel","barHome"); set("barRepeatLabel","barRepeat");
   set("allFeaturesLabel","allFeaturesLabel"); set("allTitle","allTitle");
@@ -1975,7 +1979,7 @@ function tileButton(id, big){
   const f = FEATURES[id]; if (!f) return null;
   const b = document.createElement("button");
   b.className = big ? ("tile " + (f.cls||"")) : "mini";
-  b.innerHTML = `<span class="ico">${f.ico}</span><span>${T(f.k)}</span>`;
+  b.innerHTML = `<svg class="ico" aria-hidden="true"><use href="#${f.ico}"/></svg><span>${deEmoji(T(f.k))}</span>`;
   b.addEventListener("click", ()=> press(VIEW_ACTION[id] || "go_home"));
   return b;
 }
