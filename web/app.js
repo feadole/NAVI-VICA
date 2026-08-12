@@ -83,16 +83,16 @@ symTitle symHint symChips vitalName vitalVal vitalAdd vitalAddLabel symList flas
 guideBtn guideBtnLabel guideTitle guideIntro guideList guideSpeak guideSpeakLabel guidePractice guidePracticeLabel profileLabel".split(/\s+/).forEach(id => el[id] = $(id));
 
 /* catalogue of every feature tile (icon + i18n label key + target view) */
+/* pictures matter: many of our people cannot read — a big friendly
+   picture on every button is how they find their way */
 const FEATURES = {
-  detect:{ico:"i-eye",k:"tileDetect",cls:"t-detect"}, nav:{ico:"i-nav",k:"tileNav",cls:"t-nav"},
-  alarms:{ico:"i-bell",k:"tileAlarms",cls:"t-alarm"}, sos:{ico:"i-sos",k:"tileSos",cls:"t-sos"},
-  chat:{ico:"i-chat",k:"tileChat"}, read:{ico:"i-read",k:"tileRead"}, find:{ico:"i-find",k:"tileFind"},
-  captions:{ico:"i-ear",k:"tileCaptions"}, notes:{ico:"i-note",k:"tileNotes"}, services:{ico:"i-car",k:"tileServices"},
-  health:{ico:"i-heart",k:"tileHealth"}, symptoms:{ico:"i-pulse",k:"symTitle"}, settings:{ico:"i-gear",k:"tileSettings"},
-  help:{ico:"i-grad",k:"tileHelp"}
+  detect:{ico:"👁",k:"tileDetect",cls:"t-detect"}, nav:{ico:"🧭",k:"tileNav",cls:"t-nav"},
+  alarms:{ico:"⏰",k:"tileAlarms",cls:"t-alarm"}, sos:{ico:"🆘",k:"tileSos",cls:"t-sos"},
+  chat:{ico:"💬",k:"tileChat"}, read:{ico:"📖",k:"tileRead"}, find:{ico:"🔍",k:"tileFind"},
+  captions:{ico:"👂",k:"tileCaptions"}, notes:{ico:"📝",k:"tileNotes"}, services:{ico:"🚕",k:"tileServices"},
+  health:{ico:"❤️",k:"tileHealth"}, symptoms:{ico:"🩺",k:"symTitle"}, settings:{ico:"⚙️",k:"tileSettings"},
+  help:{ico:"🎓",k:"tileHelp"}
 };
-/* headings speak plainly — decorative emoji are stripped from visible chrome */
-const deEmoji = (s) => String(s||"").replace(/^(?:\p{Extended_Pictographic}️?\s*)+/gu, "");
 /* which tiles lead each condition's home (kept short & simple) */
 const HOME_FOR = {
   vision:["detect","read","nav","sos"],
@@ -212,7 +212,8 @@ function setMic(state){
 function utter(text, rate){
   const u = new SpeechSynthesisUtterance(text);
   const code = I18N[S.lang].tts || "en-US";
-  u.lang = code; u.rate = (rate||S.rate)/100; u.pitch = 1.02;
+  /* a touch quicker and brighter than the platform default — lively, not rushed */
+  u.lang = code; u.rate = Math.min(1.5, ((rate||S.rate)/100) * 1.06); u.pitch = 1.05;
   const v = bestVoice(code);
   if (v) u.voice = v;
   return u;
@@ -242,9 +243,11 @@ function speak(text, opts){
   try{
     speechSynthesis.cancel();
     speechSynthesis.resume();   /* iOS can wedge in a paused state — always clear it */
-    /* phones speak sentence by sentence far more naturally — the voice
-       breathes between thoughts instead of droning through a paragraph */
-    const parts = String(text).match(/[^.!?…]+[.!?…]+["»”)]?\s*|[^.!?…]+$/g) || [text];
+    /* phones speak in short thought-sized pieces — natural pauses without
+       sounding sluggish (two sentences per breath, not one) */
+    const sentences = String(text).match(/[^.!?…]+[.!?…]+["»”)]?\s*|[^.!?…]+$/g) || [text];
+    const parts = [];
+    for (let i = 0; i < sentences.length; i += 2) parts.push(sentences.slice(i, i+2).join(""));
     parts.forEach((p, i)=>{
       p = p.trim(); if (!p) return;
       const u = utter(p);
@@ -1748,7 +1751,13 @@ function handle(raw){
   if (/(what day|date|какое.*число|какой.*день|какое сегодня)/.test(c)){ say(fill(R(CHAT("date")),{date:nowDate()})); return; }
   if (/(weather|погод)/.test(c)){ say(R(CHAT("weather"))); return; }
 
-  aiChat(raw, ()=>say(R(CHAT("fallback"))));
+  /* honesty: a clear request for an action she can't perform gets a real
+     answer about why, plus what she CAN do — never a shrug */
+  const looksLikeRequest = /(can you|could you|please|turn (on|off)|switch|open the|send|write to|message|email|call the|book|buy|pay|включи|выключи|отправь|напиши|позвони в|закажи билет|оплати|купи)/;
+  aiChat(raw, ()=>{
+    if (looksLikeRequest.test(c)) say(T("cantDo"));
+    else say(R(CHAT("fallback")));
+  });
 }
 
 /* Gemini small talk through the optional NAVI-VICA backend. The cloud is an
@@ -1911,7 +1920,7 @@ function applyLang(){
   document.documentElement.lang = S.lang;
   document.documentElement.dir = (S.lang==="ar"||S.lang==="fa") ? "rtl" : "ltr";
   el.langSelect.value = S.lang;
-  const set = (id,k)=>{ if (el[id]) el[id].textContent = deEmoji(T(k)); };
+  const set = (id,k)=>{ if (el[id]) el[id].textContent = T(k); };
   set("statusText","statusIdle");
   set("barHomeLabel","barHome"); set("barRepeatLabel","barRepeat");
   set("allFeaturesLabel","allFeaturesLabel"); set("allTitle","allTitle");
@@ -1946,6 +1955,7 @@ function applyLang(){
   set("mcSaveLabel","mcSaveLabel"); set("logTitle","logTitle"); set("logExportLabel","logExportLabel");
   set("setTitle","setTitle"); set("rateLabel","rateLabel"); set("hapticLabel","hapticLabel");
   const vl = document.getElementById("voiceLabel"); if (vl) vl.textContent = T("voiceLabel");
+  const sn = document.getElementById("setNeedsLabel"); if (sn) sn.textContent = T("setNeedsLabel");
   populateVoicePicker();
   set("spatialLabel","spatialLabel"); set("checkinLabel","checkinLabel"); set("battLabel","battLabel");
   set("caregiverTitle","caregiverTitle"); set("caregiverNote","caregiverNote");
@@ -1979,7 +1989,7 @@ function tileButton(id, big){
   const f = FEATURES[id]; if (!f) return null;
   const b = document.createElement("button");
   b.className = big ? ("tile " + (f.cls||"")) : "mini";
-  b.innerHTML = `<svg class="ico" aria-hidden="true"><use href="#${f.ico}"/></svg><span>${deEmoji(T(f.k))}</span>`;
+  b.innerHTML = `<span class="ico">${f.ico}</span><span>${T(f.k)}</span>`;
   b.addEventListener("click", ()=> press(VIEW_ACTION[id] || "go_home"));
   return b;
 }
@@ -2195,6 +2205,8 @@ if (voiceSel) voiceSel.addEventListener("change", ()=>{
 });
 el.profileSelect.addEventListener("change", ()=>setProfile(el.profileSelect.value));
 el.acctBtn.addEventListener("click", ()=>press("open_account"));
+const setNeedsBtn = document.getElementById("setNeeds");
+if (setNeedsBtn) setNeedsBtn.addEventListener("click", ()=>press("open_account"));
 const floatMic = document.getElementById("floatMic"), floatChat = document.getElementById("floatChat");
 if (floatMic) floatMic.addEventListener("click", ()=>micTap());
 if (floatChat) floatChat.addEventListener("click", ()=>{ openView("chat"); speakAck(T("tileChat")); });

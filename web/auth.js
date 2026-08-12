@@ -623,7 +623,7 @@ function applyAuthLang(){
   set("hTagline","hTagline"); set("goSignupLabel","goSignupLabel"); set("goSigninLabel","goSigninLabel");
   set("privacyNote","privacyNote");
   const hl = $("heroList");
-  if (hl){ hl.innerHTML=""; (tobj("heroPoints")||[]).forEach(p=>{ const li=document.createElement("li"); li.textContent=(typeof deEmoji==="function")?deEmoji(p):p; hl.append(li); }); }
+  if (hl){ hl.innerHTML=""; (tobj("heroPoints")||[]).forEach(p=>{ const li=document.createElement("li"); li.textContent=p; hl.append(li); }); }
   set("lbName","lbName"); set("lbEmail","lbEmail"); set("lbPhone","lbPhone"); set("suContactNote","suContactNote");
   set("lbPw","lbPw"); set("lbPw2","lbPw2"); set("lbQ1","lbQ1"); set("lbQ2","lbQ2");
   set("lbDob","lbDob"); set("lbHome","lbHome"); set("lbBlood","lbBlood"); set("lbAllergy","lbAllergy"); set("lbMeds","lbMeds");
