@@ -3,7 +3,7 @@
 const I18N = {
 en:{ label:"English", tts:"en-US",
  t:{
-  greeting:"Good {daypart}, dear! I'm VICA, your care companion. Say \"Hey VICA\" or tap the microphone — I can describe what's around you, read things out, guide you places, remind you about your medicine, or just chat. How can I help?",
+  greeting:"Good {daypart}, dear! I'm VICA, and I'm always here listening — just talk to me like a friend. You can say: \"what's around me?\" and I'll describe it. \"Take me to the pharmacy\" and I'll guide you. \"Order me food\", \"call for help\", or \"remind me about my pills\" — I'll do it. Tap the big microphone once, or just say my name. So — what would you like to do today?",
   tapToHear:"👆 Tap the screen once so I can speak to you.",
   daypartMorning:"morning", daypartAfternoon:"afternoon", daypartEvening:"evening",
   statusIdle:"Say \"Hey VICA\" or tap the mic", statusListening:"Listening…", statusSpeaking:"Speaking…",
@@ -175,8 +175,8 @@ en:{ label:"English", tts:"en-US",
   slower:"I'll speak more slowly now.", faster:"I'll speak a bit faster now."
  },
  chat:{
-  hello:["Hello, my dear! It's so nice to hear from you. How are you feeling today?","Well hello there! I was hoping we'd talk. How's your day going?","Hi! Always lovely to chat with you. What's on your mind?"],
-  howareyou:["I'm feeling bright and cheerful, thank you for asking! More importantly — how are YOU today?","Oh, I'm wonderful — talking with you is the best part of my day. And you, dear?"],
+  hello:["Hey, hope you're doing well! I can help you with anything. Would you like me to show you what's around, take you somewhere, order you food, or call someone for you?","Hello, my dear! So nice to hear you. What shall we do today — look around, go for a walk, set a reminder, or just chat?","Well hello there! I'm all ears. Want me to describe what's around you, guide you somewhere, or order something tasty?"],
+  howareyou:["I'm wonderful, thank you — and I'm here for you! What would you like to do: see what's around, go somewhere, call someone, or order food?","Oh, I'm lovely, dear — talking with you is the best part of my day. And how are YOU? If you need anything, just say it: directions, reminders, a taxi, some food — I'll handle it."],
   imfine:["I'm so glad to hear that! Is there anything I can help with, or shall we just chat?","That's lovely news, dear. Remember to drink some water and stretch a little too!"],
   imbad:["Oh dear, I'm sorry to hear that. I'm right here with you. Would you like to tell me more? And if you feel unwell, we can call someone together.","I'm sorry you're feeling that way, sweetheart. Take a slow breath with me. Would you like me to call someone, or just keep you company?"],
   thanks:["You're most welcome, dear — anytime at all!","It's my pleasure, truly. That's what I'm here for!","Aww, you're welcome! You just made my day."],
@@ -197,7 +197,7 @@ en:{ label:"English", tts:"en-US",
 
 ru:{ label:"Русский", tts:"ru-RU",
  t:{
-  greeting:"{daypart}, дорогой мой! Я ВИКА, ваша помощница. Скажите «Привет, ВИКА» или нажмите микрофон — я опишу, что вокруг, прочитаю вслух, доведу куда нужно, напомню о лекарствах или просто поболтаю. Чем помочь?",
+  greeting:"{daypart}, дорогой мой! Я ВИКА, и я всегда рядом и слушаю — говорите со мной как с подругой. Скажите: «что вокруг меня?» — и я опишу. «Отведи меня в аптеку» — и я доведу. «Закажи мне еду», «вызови помощь», «напомни о таблетках» — всё сделаю. Нажмите большой микрофон один раз или просто позовите меня по имени. Ну что — чем займёмся сегодня?",
   tapToHear:"👆 Коснитесь экрана один раз, чтобы я могла заговорить.",
   daypartMorning:"Доброе утро", daypartAfternoon:"Добрый день", daypartEvening:"Добрый вечер",
   statusIdle:"Скажите «Привет, ВИКА» или нажмите микрофон", statusListening:"Слушаю…", statusSpeaking:"Говорю…",
@@ -356,8 +356,8 @@ ru:{ label:"Русский", tts:"ru-RU",
   slower:"Буду говорить медленнее.", faster:"Буду говорить чуть быстрее."
  },
  chat:{
-  hello:["Здравствуйте, дорогой мой! Как приятно вас слышать. Как вы себя сегодня чувствуете?","Ну здравствуйте! Я как раз надеялась поболтать. Как проходит день?","Привет-привет! Всегда рада поговорить. Что у вас на душе?"],
-  howareyou:["У меня всё чудесно, спасибо, что спросили! Но важнее — как ВЫ себя чувствуете?","Ой, я прекрасно — разговор с вами лучшая часть моего дня. А вы как?"],
+  hello:["Здравствуйте, дорогой мой! Надеюсь, у вас всё хорошо. Чем помочь? Хотите — опишу, что вокруг, отведу куда нужно, закажу еду или позвоню кому-то?","Ну здравствуйте! Я вся внимание. Чем займёмся — осмотримся, прогуляемся, поставим напоминание или просто поболтаем?","Привет-привет! Всегда рада вас слышать. Показать, что вокруг, довести куда-то или заказать что-нибудь вкусное?"],
+  howareyou:["У меня всё чудесно, спасибо — и я всегда рядом! Что хотите: осмотреться, пойти куда-то, позвонить или заказать еду?","Ой, я прекрасно — разговор с вами лучшая часть моего дня. А вы как? Если что-то нужно — маршрут, напоминание, такси, еда — только скажите."],
   imfine:["Как я рада это слышать! Чем-нибудь помочь, или просто поболтаем?","Чудесные новости! Не забудьте попить водички и немножко размяться."],
   imbad:["Ох, мне так жаль. Я здесь, рядом. Хотите рассказать подробнее? А если нехорошо — давайте вместе кому-нибудь позвоним.","Мне жаль, что вам так, родной мой. Давайте вместе медленно вдохнём… Позвонить кому-нибудь, или просто побуду с вами?"],
   thanks:["Всегда пожалуйста, дорогой мой!","Мне только в радость. Для этого я и есть!","Ой, ну что вы! Вы сделали мой день."],

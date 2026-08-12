@@ -1,4 +1,4 @@
-const CACHE = "navi-vica-v16";
+const CACHE = "navi-vica-v17";
 const LANGS = ["ar","de","es","fa","fr","hi","it","ja","ko","nl","pl","pt","sv","tr","uk","zh"];
 const SHELL = ["./","index.html","styles.css","app.js","auth.js","cloud.js","sync.js","config.js","i18n.js","manifest.webmanifest","icons/icon-192.png","icons/icon-512.png"];
 self.addEventListener("install", e => {

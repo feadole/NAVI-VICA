@@ -268,3 +268,44 @@ body.on-auth .bottombar{display:none}
 .greet-card{box-shadow:var(--sh)}
 .big-tile{border-radius:24px}
 .bottombar{box-shadow:0 -6px 20px rgba(20,60,55,.08)}
+
+/* ================================================================
+   VICA 2.0 LOOK — fresh palette, soft depth, a face that feels alive
+   ================================================================ */
+:root{
+  --bg:#F3F6F2; --card:#FFFFFF; --ink:#17252E; --muted:#5F6E78; --line:#E1E6DE;
+  --teal:#0E6B60; --teal-soft:#DFF0EA; --gold:#F0A11C; --gold-soft:#FBEED2;
+  --blue:#3B6FE0; --green:#1FA06A; --red:#D64530; --red-soft:#FBE7E3;
+  --r:24px; --sh:0 10px 30px rgba(23,60,54,.12);
+}
+body{background:linear-gradient(180deg,#ECF4EF 0%,#F6F3EA 55%,#F3EEE2 100%)}
+.topbar{background:linear-gradient(120deg,#0A4E45,#128372);box-shadow:0 4px 18px rgba(10,78,69,.25)}
+.brand{letter-spacing:.16em}
+
+/* tiles with richer, friendlier gradients */
+.t-detect{background:linear-gradient(155deg,#12A184,#0B6B59)}
+.t-nav{background:linear-gradient(155deg,#5B82F2,#3554C8)}
+.t-alarm{background:linear-gradient(155deg,#F7B32B,#DE8E06);color:#2B1F04}
+.t-sos{background:linear-gradient(155deg,#EF6A4C,#C13A24)}
+.guide-tile{background:linear-gradient(155deg,#F7C04A,#EF9D0C);color:#2B1F04}
+
+/* the mic feels alive: a breathing ring while she listens */
+.mic{position:relative}
+.mic.listen::after,.bar-mic.listen::after{
+  content:"";position:absolute;inset:-9px;border-radius:50%;
+  border:4px solid rgba(31,160,106,.55);animation:vring 1.4s ease-out infinite;pointer-events:none}
+@keyframes vring{0%{transform:scale(.86);opacity:.95}100%{transform:scale(1.28);opacity:0}}
+.bar-mic{position:relative}
+
+/* floating rounded bottom bar */
+.bottombar{left:.6rem;right:.6rem;bottom:.5rem;height:calc(var(--bar) - .9rem);
+  border-radius:28px;border:none;background:rgba(255,255,255,.94);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  box-shadow:0 12px 32px rgba(23,60,54,.20)}
+
+/* softer cards and controls */
+.btn{border-radius:18px}
+.field{border-radius:16px;border-color:#DCE3DA}
+.status-pill{border:none;box-shadow:0 4px 14px rgba(23,60,54,.10)}
+.panel .phead{border-bottom:none;box-shadow:0 3px 12px rgba(23,60,54,.06)}
+.auth-card{border-radius:28px;box-shadow:0 16px 40px rgba(23,60,54,.14)}

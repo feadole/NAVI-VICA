@@ -238,10 +238,16 @@ function speak(text, opts){
   try{
     speechSynthesis.cancel();
     speechSynthesis.resume();   /* iOS can wedge in a paused state — always clear it */
-    const u = utter(text);
-    u.onstart = () => { speaking = true; pauseListening(); setMic("speak"); startSynthKeepalive(); };
-    u.onend = u.onerror = () => { stopSynthKeepalive(); speaking = false; setMic("idle"); setTimeout(resumeListening, 300); };
-    speechSynthesis.speak(u);
+    /* phones speak sentence by sentence far more naturally — the voice
+       breathes between thoughts instead of droning through a paragraph */
+    const parts = String(text).match(/[^.!?…]+[.!?…]+["»”)]?\s*|[^.!?…]+$/g) || [text];
+    parts.forEach((p, i)=>{
+      p = p.trim(); if (!p) return;
+      const u = utter(p);
+      if (i === 0) u.onstart = () => { speaking = true; pauseListening(); setMic("speak"); startSynthKeepalive(); };
+      if (i === parts.length - 1) u.onend = u.onerror = () => { stopSynthKeepalive(); speaking = false; setMic("idle"); setTimeout(resumeListening, 300); };
+      speechSynthesis.speak(u);
+    });
   }catch(e){ speaking = false; }
 }
 /* iPhones stop long sentences halfway unless the voice is nudged along */
@@ -267,7 +273,8 @@ function addBubble(who, text){
 /* ---------- listening: wake word + command ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, mode = "off", wantListen = false;
-const WAKE_RX = /(vica|vika|veeka|weka|viika|викк?а|вика|віка|фика|фіка|ヴィカ|ビカ|びか|维卡|薇卡|微卡|비카|वीका|विका|فيكا|ویکا|βίκα)/i;
+/* every way a microphone mishears her name still wakes her */
+const WAKE_RX = /(vica|vika|veca|vicka|veeka|weka|wika|viika|weaker|wicker|wicca|vicar|because a|викк?а|вика|віка|фика|фіка|ヴィカ|ビカ|びか|维卡|薇卡|微卡|비카|비까|वीका|विका|فيكا|ویکا|βίκα)/i;
 
 function killRec(){ if(!rec) return; try{ rec.onresult=rec.onend=rec.onerror=null; }catch(e){} try{ rec.abort(); }catch(e){} rec=null; }
 function pauseListening(){ if (mode==="cmd") return; killRec(); mode = wantListen ? "paused" : "off"; }
@@ -284,6 +291,7 @@ function resumeListening(){
 function startWake(){
   if (!SR || captionsOn) return;
   killRec(); mode = "wake"; setMic("idle");
+  wakeStarted = Date.now();
   try{
     rec = new SR();
     rec.continuous = true; rec.interimResults = true;
@@ -299,10 +307,18 @@ function startWake(){
       }
     };
     rec.onerror = (e) => { if (e.error === "not-allowed"){ wantListen = false; el.liveLine.textContent = T("micBlocked"); } };
-    rec.onend = () => { if (mode==="wake" && wantListen && !speaking && !captionsOn) setTimeout(startWake, 350); };
+    rec.onend = () => {
+      if (mode==="wake" && wantListen && !speaking && !captionsOn){
+        /* a session that dies instantly means the mic is being fought over —
+           back off instead of spinning the battery (this was the lag) */
+        wakeRetryDelay = (Date.now() - wakeStarted < 1500) ? Math.min(wakeRetryDelay * 2, 4000) : 350;
+        setTimeout(startWake, wakeRetryDelay);
+      }
+    };
     rec.start();
   }catch(e){ setTimeout(()=>{ if (wantListen && !speaking) startWake(); }, 1200); }
 }
+let wakeRetryDelay = 350, wakeStarted = 0;
 function startCommand(quiet){
   if (!SR) return;
   killRec(); mode = "cmd"; setMic("listen");
@@ -792,6 +808,10 @@ function mapsFallback(query, dest){
     ? `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lon}&travelmode=walking`
     : `https://www.google.com/maps/search/${encodeURIComponent(query||"")}`;
   el.gmapsLink.href = url; el.gmapsLink.hidden = false;
+  el.ymapsLink.href = dest
+    ? `https://yandex.com/maps/?rtext=~${dest.lat},${dest.lon}&rtt=pd`
+    : `https://yandex.com/maps/?text=${encodeURIComponent(query||"")}`;
+  el.ymapsLink.hidden = false;
   try{ window.open(url, "_blank", "noopener"); }catch(e){}
 }
 async function findPlaces(kind, text){
