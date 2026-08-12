@@ -309,3 +309,29 @@ body{background:linear-gradient(180deg,#ECF4EF 0%,#F6F3EA 55%,#F3EEE2 100%)}
 .status-pill{border:none;box-shadow:0 4px 14px rgba(23,60,54,.10)}
 .panel .phead{border-bottom:none;box-shadow:0 3px 12px rgba(23,60,54,.06)}
 .auth-card{border-radius:28px;box-shadow:0 16px 40px rgba(23,60,54,.14)}
+
+/* ================================================================
+   VICA 2.1 — deep-teal world, light rounded sheet, nothing overlaps
+   ================================================================ */
+body{background:linear-gradient(165deg,#0A3B35 0%,#0E5A50 42%,#17836F 100%)}
+.topbar{background:transparent;box-shadow:none}
+.view{background:transparent}
+/* every page's content lives on a soft light sheet */
+.scroll{background:var(--bg);border-radius:26px 26px 0 0;box-shadow:0 -12px 34px rgba(0,0,0,.22)}
+.auth-scroll{background:transparent;box-shadow:none;border-radius:0}
+/* page headers sit on the teal, airy and clear */
+.panel .phead{background:transparent;box-shadow:none;padding:.65rem 1rem .55rem}
+.phead h2{color:#fff}
+.sos-panel .phead h2{color:#FFD9CF}
+.back{background:rgba(255,255,255,.18);color:#fff}
+/* chat input bar matches the sheet */
+.chat-bar{border-top:none;box-shadow:0 -6px 18px rgba(23,60,54,.10)}
+
+/* floating voice & chat: bottom corner, never over the words */
+.float-side{top:auto;bottom:calc(1.2rem + env(safe-area-inset-bottom));right:.85rem;transform:none}
+[dir="rtl"] .float-side{right:auto;left:.85rem}
+.float-btn{width:3.9rem;height:3.9rem;font-size:1.6rem}
+
+/* welcome cards breathe on the gradient */
+.auth-card{border:none}
+.auth-logo{color:var(--teal)}
