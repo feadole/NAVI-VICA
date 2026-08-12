@@ -647,6 +647,52 @@ function applyAuthLang(){
   renderCloudBadges(); renderCloudStatus();
 }
 
-return { start, renderAccount, applyAuthLang, renderCloudStatus, renderCloudBadges, list: ()=>list, current };
+/* ===================================================================
+   VOICE / CHAT DRIVEN ACCOUNTS — VICA can open the door herself.
+   A spoken "create an account" makes a device-local account on the
+   spot (no password to remember; it opens by name on this device).
+   Password-protected accounts still ask for their password.
+   =================================================================== */
+async function voiceSignup(name){
+  const nm = String(name||"").trim();
+  if (!nm) return null;
+  const salt = randSalt();
+  const secret = "v" + Math.random().toString(36).slice(2, 12);
+  const a = {
+    id: "u" + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    cloud: false, voiceOnly: true,
+    name: nm, email: "", phone: "",
+    salt, pwHash: await hash(secret, salt),
+    q1: "", a1Hash: "", q2: "", a2Hash: "",
+    conditions: [], details: {}, emergency: {},
+    av: "🙂", created: Date.now()
+  };
+  list.push(a); persist();
+  localStorage.setItem("nv.current", a.id);
+  window.vicaSignIn(a, true);
+  return a;
+}
+function voiceSignin(name){
+  const nm = String(name||"").trim().toLowerCase();
+  let a = null;
+  if (nm) a = list.find(x => x.name.toLowerCase().includes(nm) || nm.includes(x.name.toLowerCase()));
+  if (!a && list.length === 1) a = list[0];
+  if (!a) return null;
+  if (a.voiceOnly){
+    localStorage.setItem("nv.current", a.id);
+    window.vicaSignIn(a, false);
+    return {ok:true, name:a.name};
+  }
+  openSignin();
+  const idEl = $("siId"); if (idEl) idEl.value = a.email || a.phone || "";
+  return {needsPassword:true, name:a.name};
+}
+function saveConditions(conds){
+  const a = current(); if (!a) return;
+  a.conditions = conds; persist();
+}
+
+return { start, renderAccount, applyAuthLang, renderCloudStatus, renderCloudBadges, list: ()=>list, current,
+         voiceSignup, voiceSignin, saveConditions };
 })();
 window.AUTH = AUTH;

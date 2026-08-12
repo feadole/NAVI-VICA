@@ -271,7 +271,15 @@ const WAKE_RX = /(vica|vika|veeka|weka|viika|викк?а|вика|віка|фи�
 
 function killRec(){ if(!rec) return; try{ rec.onresult=rec.onend=rec.onerror=null; }catch(e){} try{ rec.abort(); }catch(e){} rec=null; }
 function pauseListening(){ if (mode==="cmd") return; killRec(); mode = wantListen ? "paused" : "off"; }
-function resumeListening(){ if (wantListen && !speaking && mode!=="cmd" && !captionsOn) startWake(); }
+/* A conversation, not a walkie-talkie: right after VICA answers, the mic
+   opens for the reply — no need to say the wake word between turns. If
+   the person stays quiet, she settles back to waiting for "Hey VICA". */
+let followUp = false;
+function resumeListening(){
+  if (!(wantListen && !speaking && mode!=="cmd" && !captionsOn)) return;
+  if (followUp){ followUp = false; startCommand(true); }
+  else startWake();
+}
 
 function startWake(){
   if (!SR || captionsOn) return;
@@ -295,7 +303,7 @@ function startWake(){
     rec.start();
   }catch(e){ setTimeout(()=>{ if (wantListen && !speaking) startWake(); }, 1200); }
 }
-function startCommand(){
+function startCommand(quiet){
   if (!SR) return;
   killRec(); mode = "cmd"; setMic("listen");
   try{
@@ -316,7 +324,7 @@ function startCommand(){
     rec.onend = () => {
       clearTimeout(timer); setMic("idle"); mode = "off";
       if (fin){ addBubble("user", fin); handle(fin); }
-      else { speak(T("didntCatch")); }
+      else if (!quiet){ speak(T("didntCatch")); }
       keepListening();
     };
     rec.start(); arm();
@@ -777,12 +785,21 @@ function setMapLinks(dest){
     : `https://yandex.com/maps/?pt=${dest.lon},${dest.lat}&z=17`;
   el.gmapsLink.hidden = false; el.ymapsLink.hidden = false;
 }
+/* Navigation must never dead-end. If GPS is refused or the free map
+   services are down, the person still lands in a working maps app. */
+function mapsFallback(query, dest){
+  const url = dest
+    ? `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lon}&travelmode=walking`
+    : `https://www.google.com/maps/search/${encodeURIComponent(query||"")}`;
+  el.gmapsLink.href = url; el.gmapsLink.hidden = false;
+  try{ window.open(url, "_blank", "noopener"); }catch(e){}
+}
 async function findPlaces(kind, text){
   const what = kind ? kindLabel(kind) : text;
   openView("nav");
   speak(T("navSearching",{what}));
   let me;
-  try{ me = await getPos(); }catch(e){ speak(T("noGeo")); return; }
+  try{ me = await getPos(); }catch(e){ speak(T("noGeo")); mapsFallback(what); return; }
   ensureMap(me.lat, me.lon);
   marks.forEach(m=>mapObj.removeLayer(m)); marks=[];
   let places=[];
@@ -791,7 +808,7 @@ async function findPlaces(kind, text){
     if (places.length) break;
   }
   if (!places.length && text){ try{ places = await nominatim(text, me.lat, me.lon); }catch(e){} }
-  if (!places.length){ const m=T("navNone",{what,km:12}); el.navInfo.textContent=m; speak(m); return; }
+  if (!places.length){ const m=T("navNone",{what,km:12}); el.navInfo.textContent=m; speak(m); mapsFallback(what); return; }
   places.forEach(p=>p.d = haversine(me,p));
   places.sort((a,b)=>a.d-b.d);
   places.slice(0,8).forEach(p=> marks.push(L.marker([p.lat,p.lon]).addTo(mapObj).bindPopup(p.name)));
@@ -828,7 +845,11 @@ async function routeTo(me, dest){
     speak(T("navStart",{first}));
     el.navStop.hidden = false;
     liveGuide();
-  }catch(e){ console.warn("route",e); }
+  }catch(e){
+    console.warn("route",e);
+    /* route service down: hand over to the maps app so guidance continues */
+    mapsFallback(dest.name, dest);
+  }
 }
 function liveGuide(){
   if (navWatch !== null) navigator.geolocation.clearWatch(navWatch);
@@ -1333,7 +1354,7 @@ const ACTIONS = {
   verbose_detail: ()=> { S.verb="detailed"; save("nv.verb","detailed"); syncSettings(); speak(T("verbSet",{v:T("verbDetailed")})); },
   stop_everything:()=> { stopDetect(false); stopNav(false); if (captionsOn) stopCaptions();
                          speechSynthesis.cancel(); speaking=false; speak(T("stopped")); },
-  listen_off:     ()=> { wantListen=false; GSAVE("nv.listen","0"); killRec(); mode="off"; setMic("idle"); speak(T("stopped")); }
+  listen_off:     ()=> { wantListen=false; followUp=false; GSAVE("nv.listen","0"); killRec(); mode="off"; setMic("idle"); speak(T("stopped")); }
 };
 
 /* A readable phrase for each action, so a tap produces the same
@@ -1452,15 +1473,88 @@ function runAction(name, args, source){
 function press(name, args){ buzz(HAPTIC.ok); return runAction(name, args, "touch"); }
 
 /* ===================================================================
+   VOICE-DRIVEN ACCOUNTS — "create an account" / "log in", spoken or typed,
+   in any of the app's languages
+   =================================================================== */
+let pendingAsk = null;
+const SIGNUP_RX = /(create (an |my |a )?account|sign ?up|register me|new account|создай (мне )?аккаунт|зарегистрируй|cr[ée]e[rz]? (un |mon )?compte|inscri[sv]|crear (una )?cuenta|reg[íi]strame|criar (uma )?conta|crea(re)? un account|registrami|konto erstellen|registrier|maak een account|registreren|skapa (ett )?konto|utw[óo]rz konto|za[łl][óo][żz] konto|hesap oluştur|kayıt ol|أنشئ حساب|انشئ حساب|إنشاء حساب|حساب بساز|ثبت نام|खाता बनाओ|नया खाता|注册|创建账户|開設|アカウント(を)?作|계정 만들|가입|створи (мені )?акаунт|зареєструй)/;
+const SIGNIN_RX = /(\blog ?in\b|\bsign ?in\b|войди|войти|connecte[- ]moi|me connecter|iniciar sesi[óo]n|entrar na (minha )?conta|accedi al|fammi accedere|melde mich an|anmelden|log mij in|inloggen|logga in|zaloguj|giriş yap|سجل دخول|تسجيل الدخول|وارد شو|ورود کن|लॉग इन|लॉगिन करो|登录|ログイン|로그인|увійди|увійти)/;
+
+function startVoiceSignup(){
+  pendingAsk = {type:"signup_name"};
+  speak(T("vsAskName"));
+}
+async function doVoiceSignup(raw){
+  const name = String(raw||"").replace(/[.?!,]/g,"").trim();
+  if (!name || name.length < 2){ speak(T("vsNoName")); pendingAsk = {type:"signup_name"}; return; }
+  if (!window.AUTH || !AUTH.voiceSignup){ speak(T("actionFailed")); return; }
+  try{
+    const a = await AUTH.voiceSignup(name);
+    if (!a){ speak(T("actionFailed")); return; }
+    pendingAsk = {type:"setup_condition"}; followUp = true;
+    speak(T("vsWelcome",{name}) + " " + T("vsAskCondition"));
+  }catch(e){ speak(T("actionFailed")); }
+}
+function startVoiceSignin(){
+  if (!window.AUTH){ speak(T("actionFailed")); return; }
+  const accounts = AUTH.list();
+  if (!accounts.length){ startVoiceSignup(); return; }
+  if (accounts.length === 1){ doVoiceSignin(accounts[0].name); return; }
+  pendingAsk = {type:"signin_name"};
+  speak(T("vsAskWho"));
+}
+function doVoiceSignin(raw){
+  const r = AUTH.voiceSignin(String(raw||"").replace(/[.?!,]/g,"").trim());
+  if (!r){ speak(T("vsNotFound")); pendingAsk = {type:"signin_name"}; return; }
+  if (r.needsPassword){ speak(T("vsNeedPw",{name:r.name})); }
+}
+/* first spoken setup: the person names their difficulty, VICA shapes the app */
+function applyVoiceCondition(c){
+  const conds = TO("conditions") || {};
+  const picked = [];
+  for (const [key,label] of Object.entries(conds)){
+    const words = String(label).toLowerCase().replace(/[^\p{L}\s]/gu," ").split(/\s+/).filter(w=>w.length>3);
+    if (words.some(w=>c.includes(w))) picked.push(key);
+  }
+  const extra = [
+    ["vision",   /(see|sight|eye|blind|зрен|глаз|вижу|voir|vue|yeux|vista|ojos|olhos|augen|sehen|ogen|syn|ögon|wzrok|göz|بصر|عين|چشم|बिनाई|आंख|视力|目|시력|зір)/],
+    ["hearing",  /(hear|deaf|слыш|слух|entend|sourd|o[íi]do|escut|ouvi|h[öo]r|geh[öo]r|s[łl]ysz|duy|سمع|شنو|सुन|听|耳|청각|чую)/],
+    ["motor",    /(walk|move|wheelchair|leg|ход|двига|коляс|ноги|march|jamb|camin|pierna|andar|perna|geh|lauf|lopen|g[åa]|chodz|y[üu]r[üu]|مشي|حرك|راه رفتن|चल|走|歩|걷|ходити)/],
+    ["cognitive",/(memory|forget|памят|забыв|m[ée]moire|oubli|memoria|olvid|mem[óo]ria|esquec|ged[äa]cht|vergess|geheugen|minne|pami[ęe][ćc]|haf[ıi]za|unut|ذاكرة|نسي|حافظه|فراموش|याद|भूल|记忆|忘|기억|пам)/],
+    ["chronic",  /(health|pressure|diabet|heart|болезн|давлен|сердц|диабет|sant[ée]|tension|c[œo]ur|salud|coraz[óo]n|sa[úu]de|cora[çc][ãa]o|gesundheit|herz|gezondheid|hart|h[äa]lsa|hj[äa]rta|zdrowi|serc|sa[ğg]l[ıi]k|kalp|صحة|قلب|سلامتی|سکر|सेहत|दिल|健康|心脏|心臓|건강|심장|тиск|серц)/],
+    ["speech",   /(speak|talk|voice trouble|говор|речь|parle|habla|fala|sprech|spreken|tala|m[óo]wi|konu[şs]|كلام|نطق|صحبت|बोल|说话|話す|말하|мовлен)/],
+    ["mood",     /(lonely|sad|alone|одинок|грустн|seul|triste|solo|sozinho|einsam|traurig|eenzaam|ensam|samotn|yaln[ıi]z|وحيد|حزين|تنها|अकेल|उदास|孤独|寂し|외로|самотн)/]
+  ];
+  for (const [k,rx] of extra) if (rx.test(c) && !picked.includes(k)) picked.push(k);
+  if (!picked.length){ pendingAsk = {type:"setup_condition"}; speak(T("vsCondUnknown")); return; }
+  tailorFromConditions(picked, false);
+  if (window.AUTH && AUTH.saveConditions) AUTH.saveConditions(picked);
+  speak(T("vsCondSet"));
+}
+
+/* ===================================================================
    THE BRAIN — every feature reachable by speech or text
    =================================================================== */
 let rehearsing = false;
 function handle(raw){
   const c = String(raw||"").toLowerCase().trim();
   const say = (s)=>speak(s);
+  followUp = true;   /* after the reply, the mic reopens by itself */
 
   /* dictating a note takes priority */
   if (noteCapture){ noteCapture = false; addNote(raw.trim()); openView("notes"); return; }
+
+  /* VICA asked a question — this is the answer */
+  if (pendingAsk){
+    const ask = pendingAsk; pendingAsk = null;
+    if (ask.type === "signup_name"){ doVoiceSignup(raw); return; }
+    if (ask.type === "signin_name"){ doVoiceSignin(raw); return; }
+    if (ask.type === "setup_condition"){ applyVoiceCondition(c); return; }
+  }
+
+  /* she can open the door herself: spoken or typed account creation/login */
+  if (SIGNUP_RX.test(c)){ startVoiceSignup(); return; }
+  if (!/(sign out|log out|выйти|выход)/.test(c) && SIGNIN_RX.test(c)){ startVoiceSignin(); return; }
 
   /* ---- unified router: typed, spoken and tapped all land here ---- */
   for (const amb of AMBIGUOUS){ if (amb.rx.test(c)){ disambiguate(amb); return; } }
