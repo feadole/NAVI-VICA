@@ -391,4 +391,43 @@
   };
   L.t.voiceLabel = 'Voce';
   L.t.voiceSet = 'Le piace questa voce? Può cambiarla in qualsiasi momento nelle impostazioni.';
+  Object.assign(L.t, {
+  greetHi:"{daypart}",
+  cantDo:"Mi dispiace, tesoro — questo non posso farlo. Alcune cose — altre app, pagamenti, impostazioni private del telefono — mi sono precluse per la Sua sicurezza e la Sua privacy. Ma ecco cosa POSSO fare: descrivere ciò che La circonda, leggere testi ad alta voce, guidarLa ovunque, ricordarLe le medicine, chiamare i Suoi cari, condividere la Sua posizione, ordinare un taxi o del cibo, e farLe compagnia. Basta chiedere!",
+  setNeedsLabel:"Le mie esigenze e i miei dati",
+  vsAskName:"Con piacere! Con quale nome devo chiamarLa?",
+  vsNoName:"Non ho colto il nome, tesoro. Mi dica semplicemente il Suo nome.",
+  vsWelcome:"Meraviglioso — il Suo account è pronto, {name}! Questo telefono si ricorderà di Lei.",
+  vsAskCondition:"Ora mi dica in cosa devo aiutarLa di più: vista, udito, movimento, memoria, salute, parola — o la solitudine?",
+  vsCondUnknown:"Me lo dica con una parola — per esempio: vista, udito, camminare, memoria, salute, parola o solitudine.",
+  vsCondSet:"Fatto! Ho sistemato tutto per Lei. Può cambiarlo in qualsiasi momento — me lo chieda o apra le impostazioni.",
+  vsAskWho:"Certo. Di chi è l'account — qual è il nome?",
+  vsNotFound:"Non ho trovato quell'account, tesoro. Ripeta il nome, oppure dica «crea un account».",
+  vsNeedPw:"Ho trovato il Suo account, {name}. È protetto — digiti la password su questo schermo, per favore.",
+  vitalsTitle:"🫀 La mia salute", barHealth:"Salute", barChat:"Chat",
+  pulseLabel:"Polso", bpLabel:"Pressione", bpmWord:"bpm",
+  pulseSec:"Polso in questo momento", bpSec:"Pressione arteriosa",
+  typeReading:"Aggiungi una misurazione", saveReading:"Salva", pulsePh:"Polso", sysPh:"Massima", diaPh:"Minima",
+  sayReadingHint:"Può anche dirmelo e basta — «la mia pressione è 130 su 85», o «il mio polso è 72».",
+  alertRule:"Se il Suo polso sale sopra 120 o scende sotto 45, Le chiederò se sta bene. Se non risponde entro un minuto, aprirò la schermata di emergenza e chiamerò il Suo primo contatto.",
+  vHist:"Cronologia", shareDoctor:"Condividi con il mio medico",
+  braceConnect:"Collegare un braccialetto o un misuratore",
+  braceSearching:"Sto cercando il Suo braccialetto — prema ora il suo pulsante.",
+  braceConnected:"Collegato", braceDone:"Collegato! D'ora in poi terrò d'occhio il Suo polso.",
+  braceNone:"Non collegato — digiti le misurazioni, o semplicemente le dica",
+  braceNotSupported:"Il browser di questo telefono non consente il Bluetooth, tesoro. Digiti le Sue misurazioni qui sotto — o semplicemente me le dica.",
+  braceLineOn:"Braccialetto collegato · {t}", braceLineOff:"Nessun braccialetto — tocchi per collegarne uno",
+  updatedAt:"Aggiornato {t}", justNow:"proprio ora", minAgo:"{m} min fa",
+  noVitalsYet:"Ancora nessuna misurazione. Ne digiti una qui sotto — o semplicemente me la dica.",
+  vitalsSpoken:"Il Suo polso è {p}, e la pressione {s} su {d}.",
+  pulseOnlySpoken:"Il Suo polso è {p}.",
+  bpSavedSpoken:"Salvato — {s} su {d}{verdict}",
+  pulseSavedSpoken:"Salvato — polso {p}{verdict}",
+  verdictNormal:". Tutto bello e nella norma.",
+  verdictHigh:". È un po' alto — si riposi un momento, e ricontrolleremo tra poco.",
+  verdictLow:". È un po' basso — si sieda, tesoro, e mi dica come si sente.",
+  statusNormal:"Normale", statusHigh:"Alto", statusLow:"Basso",
+  pulseAlertAsk:"Il Suo polso è {p}, {name}. Si sente bene? Se non risponde entro un minuto, chiamerò la Sua famiglia.",
+  alertOkReply:"Grazie al cielo. Continuerò a vegliare in silenzio."
+  });
 })();

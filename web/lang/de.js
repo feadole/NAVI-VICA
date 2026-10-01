@@ -391,4 +391,43 @@
   };
   L.t.voiceLabel = 'Stimme';
   L.t.voiceSet = 'Wie gefällt Ihnen diese Stimme? Sie können sie jederzeit in den Einstellungen ändern.';
+  Object.assign(L.t, {
+  greetHi:"{daypart}",
+  cantDo:"Es tut mir leid, mein Liebes — das kann ich nicht. Manche Dinge — fremde Apps, Zahlungen, private Telefoneinstellungen — sind für mich gesperrt, zu Ihrer Sicherheit und für Ihre Privatsphäre. Aber das KANN ich: beschreiben, was um Sie herum ist, Texte vorlesen, Sie überallhin führen, an Medikamente erinnern, Ihre Lieben anrufen, Ihren Standort teilen, ein Taxi oder Essen bestellen — und Ihnen Gesellschaft leisten. Fragen Sie mich einfach!",
+  setNeedsLabel:"Meine Bedürfnisse und Angaben",
+  vsAskName:"Sehr gern! Wie darf ich Sie nennen?",
+  vsNoName:"Ich habe keinen Namen verstanden, mein Liebes. Sagen Sie mir einfach Ihren Vornamen.",
+  vsWelcome:"Wunderbar — Ihr Konto ist bereit, {name}! Dieses Telefon wird sich an Sie erinnern.",
+  vsAskCondition:"Sagen Sie mir nun, wobei ich am meisten helfen soll: Augen, Hören, Gehen, Gedächtnis, Gesundheit, Sprechen — oder gegen die Einsamkeit?",
+  vsCondUnknown:"Sagen Sie es mit einem Wort — zum Beispiel: Augen, Hören, Gehen, Gedächtnis, Gesundheit, Sprechen oder einsam.",
+  vsCondSet:"Fertig! Ich habe alles für Sie eingerichtet. Sie können das jederzeit ändern — fragen Sie mich einfach oder öffnen Sie die Einstellungen.",
+  vsAskWho:"Natürlich. Wessen Konto ist es — wie lautet der Name?",
+  vsNotFound:"Dieses Konto habe ich nicht gefunden, mein Liebes. Sagen Sie den Namen noch einmal, oder sagen Sie „Konto erstellen“.",
+  vsNeedPw:"Ich habe Ihr Konto gefunden, {name}. Es ist geschützt — bitte geben Sie Ihr Passwort auf diesem Bildschirm ein.",
+  vitalsTitle:"🫀 Meine Gesundheit", barHealth:"Gesundheit", barChat:"Chat",
+  pulseLabel:"Puls", bpLabel:"Blutdruck", bpmWord:"bpm",
+  pulseSec:"Puls im Moment", bpSec:"Blutdruck",
+  typeReading:"Messwert hinzufügen", saveReading:"Speichern", pulsePh:"Puls", sysPh:"Oberer", diaPh:"Unterer",
+  sayReadingHint:"Sie können es mir auch einfach sagen — „mein Blutdruck ist 130 zu 85“ oder „mein Puls ist 72“.",
+  alertRule:"Steigt Ihr Puls über 120 oder fällt er unter 45, frage ich, ob es Ihnen gut geht. Wenn Sie nicht innerhalb einer Minute antworten, öffne ich die Notfallseite und rufe Ihren ersten Kontakt an.",
+  vHist:"Verlauf", shareDoctor:"Mit meinem Arzt teilen",
+  braceConnect:"Armband oder Manschette verbinden",
+  braceSearching:"Ich suche Ihr Armband — drücken Sie jetzt seinen Knopf.",
+  braceConnected:"Verbunden", braceDone:"Verbunden! Ab jetzt behalte ich Ihren Puls im Blick.",
+  braceNone:"Nicht verbunden — Werte eintippen oder einfach sagen",
+  braceNotSupported:"Der Browser dieses Telefons erlaubt kein Bluetooth, mein Liebes. Tippen Sie Ihre Werte unten ein — oder sagen Sie sie mir einfach.",
+  braceLineOn:"Armband verbunden · {t}", braceLineOff:"Kein Armband — zum Verbinden antippen",
+  updatedAt:"Aktualisiert {t}", justNow:"gerade eben", minAgo:"vor {m} Min.",
+  noVitalsYet:"Noch keine Werte. Tippen Sie unten einen ein — oder sagen Sie ihn mir einfach.",
+  vitalsSpoken:"Ihr Puls ist {p}, und der Blutdruck {s} zu {d}.",
+  pulseOnlySpoken:"Ihr Puls ist {p}.",
+  bpSavedSpoken:"Gespeichert — {s} zu {d}{verdict}",
+  pulseSavedSpoken:"Gespeichert — Puls {p}{verdict}",
+  verdictNormal:". Sieht wunderbar normal aus.",
+  verdictHigh:". Das ist etwas hoch — ruhen Sie sich einen Moment aus, wir prüfen es bald noch einmal.",
+  verdictLow:". Das ist etwas niedrig — setzen Sie sich, mein Liebes, und erzählen Sie mir, wie Sie sich fühlen.",
+  statusNormal:"Normal", statusHigh:"Hoch", statusLow:"Niedrig",
+  pulseAlertAsk:"Ihr Puls ist {p}, {name}. Geht es Ihnen gut? Wenn Sie nicht in einer Minute antworten, rufe ich Ihre Familie an.",
+  alertOkReply:"Gott sei Dank. Ich passe still weiter auf."
+  });
 })();

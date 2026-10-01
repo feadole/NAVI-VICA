@@ -391,4 +391,43 @@
   };
   L.t.voiceLabel = 'Voix';
   L.t.voiceSet = 'Cette voix vous plaît-elle ? Vous pouvez la changer à tout moment dans les réglages.';
+  Object.assign(L.t, {
+  greetHi:"{daypart}",
+  cantDo:"Je suis désolée, cher ami — cela, je ne peux pas le faire. Certaines choses — les autres applications, les paiements, les réglages privés du téléphone — me sont fermées pour votre sécurité et votre vie privée. Mais voici ce que je SAIS faire : décrire ce qui vous entoure, lire un texte à voix haute, vous guider où vous voulez, vous rappeler vos médicaments, appeler vos proches, envoyer votre position, commander un taxi ou un repas, et vous tenir compagnie. Demandez-moi, tout simplement !",
+  setNeedsLabel:"Mes besoins et mes informations",
+  vsAskName:"Avec plaisir ! Quel prénom dois-je utiliser pour vous ?",
+  vsNoName:"Je n'ai pas saisi de prénom, cher ami. Dites-moi simplement votre prénom.",
+  vsWelcome:"Merveilleux — votre compte est prêt, {name} ! Ce téléphone se souviendra de vous.",
+  vsAskCondition:"Maintenant, dites-moi pour quoi je dois vous aider le plus : les yeux, l'audition, les déplacements, la mémoire, la santé, la parole — ou la solitude ?",
+  vsCondUnknown:"Dites-le en un mot — par exemple : yeux, audition, marche, mémoire, santé, parole, ou solitude.",
+  vsCondSet:"C'est fait ! J'ai tout arrangé pour vous. Vous pourrez changer cela à tout moment — demandez-le-moi ou ouvrez les réglages.",
+  vsAskWho:"Bien sûr. À qui est ce compte — quel est le prénom ?",
+  vsNotFound:"Je n'ai pas trouvé ce compte, cher ami. Redites le prénom, ou dites « créer un compte ».",
+  vsNeedPw:"J'ai trouvé votre compte, {name}. Il est protégé — saisissez votre mot de passe sur cet écran, s'il vous plaît.",
+  vitalsTitle:"🫀 Ma santé", barHealth:"Santé", barChat:"Discuter",
+  pulseLabel:"Pouls", bpLabel:"Tension", bpmWord:"bpm",
+  pulseSec:"Pouls en ce moment", bpSec:"Tension artérielle",
+  typeReading:"Ajouter une mesure", saveReading:"Enregistrer", pulsePh:"Pouls", sysPh:"Haute", diaPh:"Basse",
+  sayReadingHint:"Vous pouvez aussi me le dire tout simplement — « ma tension est 130 sur 85 », ou « mon pouls est à 72 ».",
+  alertRule:"Si votre pouls dépasse 120 ou descend sous 45, je vous demanderai si tout va bien. Sans réponse dans la minute, j'ouvrirai l'écran d'urgence et j'appellerai votre premier contact.",
+  vHist:"Historique", shareDoctor:"Partager avec mon médecin",
+  braceConnect:"Connecter un bracelet ou un tensiomètre",
+  braceSearching:"Je cherche votre bracelet — appuyez sur son bouton maintenant.",
+  braceConnected:"Connecté", braceDone:"Connecté ! Désormais, je veillerai sur votre pouls.",
+  braceNone:"Non connecté — saisissez vos mesures, ou dites-les-moi",
+  braceNotSupported:"Le navigateur de ce téléphone n'autorise pas le Bluetooth, cher ami. Saisissez vos mesures ci-dessous — ou dites-les-moi tout simplement.",
+  braceLineOn:"Bracelet connecté · {t}", braceLineOff:"Pas de bracelet — touchez pour en connecter un",
+  updatedAt:"Mis à jour {t}", justNow:"à l'instant", minAgo:"il y a {m} min",
+  noVitalsYet:"Pas encore de mesure. Saisissez-en une ci-dessous — ou dites-la-moi.",
+  vitalsSpoken:"Votre pouls est à {p}, et votre tension {s} sur {d}.",
+  pulseOnlySpoken:"Votre pouls est à {p}.",
+  bpSavedSpoken:"Enregistré — {s} sur {d}{verdict}",
+  pulseSavedSpoken:"Enregistré — pouls {p}{verdict}",
+  verdictNormal:". C'est joli et tout à fait normal.",
+  verdictHigh:". C'est un peu élevé — reposez-vous un instant, et nous revérifierons bientôt.",
+  verdictLow:". C'est un peu bas — asseyez-vous, cher ami, et dites-moi comment vous vous sentez.",
+  statusNormal:"Normal", statusHigh:"Élevé", statusLow:"Bas",
+  pulseAlertAsk:"Votre pouls est à {p}, {name}. Vous sentez-vous bien ? Sans réponse dans la minute, j'appellerai votre famille.",
+  alertOkReply:"Dieu merci. Je continue de veiller tout doucement."
+  });
 })();
