@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NAVI-VICA — Care Companion</title>
 <meta name="description" content="NAVI-VICA: voice-first care companion for elderly and disabled users. On-device YOLOv9 detection, navigation, reading, reminders, SOS.">
-<meta name="theme-color" content="#0F5B54">
+<meta name="theme-color" content="#FBF4EA">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -37,6 +37,11 @@
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.79.65 2.63a2 2 0 0 1-.45 2.11L8 9.75a16 16 0 0 0 6.25 6.25l1.29-1.31a2 2 0 0 1 2.11-.45c.84.31 1.73.53 2.63.65A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-hpulse" viewBox="0 0 24 24"><path d="M12 21s-7-4.4-9.3-9A5.3 5.3 0 0 1 12 6.6 5.3 5.3 0 0 1 21.3 12C19 16.6 12 21 12 21z"/><path d="M3 12h4l2-3 3 6 2-3h7"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 14a8 8 0 0 1 16 0"/><path d="M12 14l3.5-4"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-bracelet" viewBox="0 0 24 24"><rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6V3h6v3M9 18v3h6v-3"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></symbol>
 </svg>
 
 <header class="topbar">
@@ -227,16 +232,31 @@
 
 <main id="home" class="view">
   <div class="scroll">
-    <section class="greet-card"><p id="greetText"></p></section>
+    <!-- greeting with the one big mic beside it (mockup 02) -->
+    <section class="greet-row">
+      <div class="greet-txt">
+        <div class="greet-name" id="greetText"></div>
+        <div class="greet-sub"><span class="dot" id="statusDot"></span><span id="statusText"></span></div>
+      </div>
+      <button id="micBtn" class="mic idle" aria-label="Talk to VICA"><svg class="svgi"><use href="#i-mic"/></svg></button>
+    </section>
+    <div class="live-line" id="liveLine" role="status" aria-live="polite"></div>
+
+    <!-- pulse and blood pressure, straight from the mockup -->
+    <button class="vitals-card" id="vitalsCard" aria-label="My health">
+      <span class="vit-half">
+        <span class="vchip red"><svg class="ico"><use href="#i-hpulse"/></svg></span>
+        <span class="vit-txt"><span class="vit-k" id="homePulseLabel"></span><span class="vit-v"><b id="homePulse">—</b> <small id="homePulseUnit"></small></span></span>
+      </span>
+      <span class="vit-divider"></span>
+      <span class="vit-half">
+        <span class="vchip purple"><svg class="ico"><use href="#i-gauge"/></svg></span>
+        <span class="vit-txt"><span class="vit-k" id="homeBpLabel"></span><span class="vit-v"><b id="homeBp">—</b></span></span>
+      </span>
+    </button>
+    <button class="brace-line" id="braceLine"></button>
 
     <section class="orient-card" id="orientCard" hidden><p id="orientText"></p></section>
-
-    <section class="mic-zone">
-      <button id="micBtn" class="mic idle" aria-label="Talk to VICA"><svg class="svgi"><use href="#i-mic"/></svg></button>
-      <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText"></span></div>
-      <div class="live-line" id="liveLine" role="status" aria-live="polite"></div>
-    </section>
-
     <div class="aac-strip" id="aacStrip" hidden></div>
 
     <nav class="grid-main" id="homeGrid" aria-label="Main actions"></nav>
@@ -247,6 +267,45 @@
     </div>
   </div>
 </main>
+
+<!-- ============ MY HEALTH — pulse & blood pressure (mockup 10) ============ -->
+<section id="vitals" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="vitalsTitle"></h2></div>
+<div class="scroll">
+  <button class="brace-row" id="braceRow">
+    <span class="vchip purple big"><svg class="ico"><use href="#i-bracelet"/></svg></span>
+    <span class="brace-txt"><b id="braceName"></b><small id="braceState"></small></span>
+    <span class="chip-badge" id="braceBadge"></span>
+  </button>
+
+  <div class="vital-big">
+    <div class="vital-head"><span class="sec-label" id="pulseSecLabel"></span><span class="chip-badge" id="pulseBadge"></span></div>
+    <div class="vital-value"><span class="vchip red big"><svg class="ico"><use href="#i-hpulse"/></svg></span>
+      <b id="vPulse">—</b><small id="vPulseUnit"></small></div>
+    <div class="spark" id="pulseSpark"></div>
+  </div>
+
+  <div class="vital-big">
+    <div class="vital-head"><span class="sec-label" id="bpSecLabel"></span><span class="chip-badge" id="bpBadge"></span></div>
+    <div class="vital-value"><span class="vchip purple big"><svg class="ico"><use href="#i-gauge"/></svg></span>
+      <b id="vBp">—</b><small>mmHg</small></div>
+    <div class="note" id="vUpdated"></div>
+  </div>
+
+  <h3 id="typeReadingTitle"></h3>
+  <div class="inline wrap">
+    <input id="inPulse" class="field" type="number" inputmode="numeric" min="20" max="250">
+    <input id="inSys" class="field" type="number" inputmode="numeric" min="60" max="260">
+    <input id="inDia" class="field" type="number" inputmode="numeric" min="30" max="200">
+    <button id="saveReading" class="btn primary big">＋ <span id="saveReadingLabel"></span></button>
+  </div>
+  <p class="note" id="sayReadingHint"></p>
+
+  <p class="note alert-rule" id="alertRuleNote"></p>
+
+  <h3 id="vHistTitle"></h3>
+  <div id="vitalsHist" class="list"></div>
+  <div class="btn-row"><button id="shareDoctor" class="btn secondary big"><svg class="ico"><use href="#i-share"/></svg> <span id="shareDoctorLabel"></span></button></div>
+</div></section>
 
 <!-- ============ HOW TO USE (profile-aware) ============ -->
 <section id="guide" class="view panel"><div class="phead"><button class="back" data-back>‹</button><h2 id="guideTitle"></h2></div>
@@ -503,10 +562,11 @@
   <button id="floatChat" class="float-btn" aria-label="Chat with VICA"><svg class="svgi"><use href="#i-chat"/></svg></button>
 </div>
 
-<!-- ============ BOTTOM BAR (never overlaps content) ============ -->
+<!-- ============ BOTTOM BAR — Home · Health · Chat · Repeat (one mic per screen) ============ -->
 <nav class="bottombar" aria-label="Quick bar">
   <button id="barHome" class="bar-btn"><svg class="ico"><use href="#i-home"/></svg><span id="barHomeLabel"></span></button>
-  <button id="barMic" class="bar-mic idle" aria-label="Talk to VICA"><svg class="svgi"><use href="#i-mic"/></svg></button>
+  <button id="barHealth" class="bar-btn"><svg class="ico"><use href="#i-hpulse"/></svg><span id="barHealthLabel"></span></button>
+  <button id="barChat" class="bar-btn"><svg class="ico"><use href="#i-chat"/></svg><span id="barChatLabel"></span></button>
   <button id="barRepeat" class="bar-btn"><svg class="ico"><use href="#i-repeat"/></svg><span id="barRepeatLabel"></span></button>
 </nav>
 

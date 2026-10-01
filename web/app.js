@@ -56,7 +56,12 @@ const colourName = (c) => S.lang === "ru" ? (COLOURS_RU[c]||c) : (COLOURS_EN[c]|
 
 const $ = (id) => document.getElementById(id);
 const el = {};
-"langSelect profileSelect greetText statusDot statusText micBtn liveLine barMic barHome barHomeLabel barRepeat barRepeatLabel \
+"langSelect profileSelect greetText statusDot statusText micBtn liveLine barHome barHomeLabel barRepeat barRepeatLabel \
+barHealth barHealthLabel barChat barChatLabel \
+homePulse homeBp homePulseLabel homeBpLabel homePulseUnit vitalsCard braceLine \
+vitalsTitle braceRow braceName braceState braceBadge pulseSecLabel pulseBadge vPulse vPulseUnit \
+bpSecLabel bpBadge vBp vUpdated typeReadingTitle inPulse inSys inDia saveReading saveReadingLabel \
+sayReadingHint alertRuleNote vHistTitle vitalsHist pulseSpark shareDoctor shareDoctorLabel \
 \
 detTitle video overlay camIdle profileBadge torchBtn detBtn detBtnLabel detStop detStopLabel detResult confLabel confRange confVal \
 verbLabel verbSelect modelLabel modelSelect \
@@ -90,7 +95,7 @@ const FEATURES = {
   alarms:{ico:"⏰",k:"tileAlarms",cls:"t-alarm"}, sos:{ico:"🆘",k:"tileSos",cls:"t-sos"},
   chat:{ico:"💬",k:"tileChat"}, read:{ico:"📖",k:"tileRead"}, find:{ico:"🔍",k:"tileFind"},
   captions:{ico:"👂",k:"tileCaptions"}, notes:{ico:"📝",k:"tileNotes"}, services:{ico:"🚕",k:"tileServices"},
-  health:{ico:"❤️",k:"tileHealth"}, symptoms:{ico:"🩺",k:"symTitle"}, settings:{ico:"⚙️",k:"tileSettings"},
+  health:{ico:"❤️",k:"tileHealth"}, vitals:{ico:"🫀",k:"vitalsTitle"}, symptoms:{ico:"🩺",k:"symTitle"}, settings:{ico:"⚙️",k:"tileSettings"},
   help:{ico:"🎓",k:"tileHelp"}
 };
 /* which tiles lead each condition's home (kept short & simple) */
@@ -120,6 +125,10 @@ function openView(id){
   const v = $(id); if (!v) return;
   v.classList.add("active"); currentView = id;
   document.body.classList.toggle("on-auth", v.classList.contains("auth"));
+  /* the bottom bar shows where you are */
+  const barFor = { home:"barHome", vitals:"barHealth", chat:"barChat" };
+  ["barHome","barHealth","barChat","barRepeat"].forEach(b => el[b] && el[b].classList.toggle("active", barFor[id] === b));
+  if (id === "vitals") renderVitals();
   if (id === "nav" && mapObj) setTimeout(()=>mapObj.invalidateSize(), 180);
   if (id === "chat") setTimeout(()=>{ el.chatLog.parentElement.scrollTop = el.chatLog.parentElement.scrollHeight; }, 60);
   if (id === "find") renderFind();
@@ -205,8 +214,7 @@ function populateVoicePicker(){
 let speaking = false, lastSpoken = "";
 function setMic(state){
   el.micBtn.className = "mic " + state;
-  el.barMic.className = "bar-mic " + state;
-  el.statusDot.style.background = state==="listen" ? "var(--green)" : state==="speak" ? "var(--red)" : "var(--blue)";
+  el.statusDot.style.background = state==="listen" ? "var(--green)" : state==="speak" ? "var(--red)" : "var(--terra)";
   el.statusText.textContent = state==="listen" ? T("statusListening") : state==="speak" ? T("statusSpeaking") : T("statusIdle");
 }
 function utter(text, rate){
@@ -365,7 +373,10 @@ function micTap(){
   startCommand();
 }
 el.micBtn.addEventListener("click", micTap);
-el.barMic.addEventListener("click", micTap);
+el.barHealth.addEventListener("click", ()=>press("open_vitals"));
+el.barChat.addEventListener("click", ()=>press("open_chat"));
+el.vitalsCard.addEventListener("click", ()=>press("open_vitals"));
+el.braceLine.addEventListener("click", ()=>press("open_vitals"));
 el.barRepeat.addEventListener("click", ()=> speak(lastSpoken || T("repeatNone")));
 
 /* ===================================================================
@@ -1277,6 +1288,185 @@ el.logExport.addEventListener("click", ()=>{
 
 
 /* ===================================================================
+   MY HEALTH — pulse & blood pressure (mockup 10)
+   Readings come from a Bluetooth bracelet/cuff (Android Chrome), typed
+   fields, or simply spoken: "my blood pressure is 130 over 85".
+   Beyond the limits VICA checks on you, then calls your first contact.
+   =================================================================== */
+const VIT_LIMITS = { pulseHigh: 120, pulseLow: 45, sysHigh: 160, diaHigh: 100 };
+let VITALS = JSON.parse(LS("nv.vitals", "null")) || { pulse:null, sys:null, dia:null, at:null, source:null };
+let VITLOG = JSON.parse(LS("nv.vitlog", "[]"));
+let vitAlertPending = false, vitAlertTimer = null, vitAlertCooldown = 0;
+let braceDevice = null;
+
+function saveVitals(){ save("nv.vitals", JSON.stringify(VITALS)); save("nv.vitlog", JSON.stringify(VITLOG)); }
+
+function fmtAgo(at){
+  if (!at) return "—";
+  const m = Math.round((Date.now() - at) / 60000);
+  return m < 1 ? T("justNow") : T("minAgo", {m});
+}
+function pulseStatus(p){ return p==null ? null : p >= VIT_LIMITS.pulseHigh ? "high" : p <= VIT_LIMITS.pulseLow ? "low" : "ok"; }
+function bpStatus(s,d){ return (s==null||d==null) ? null : (s >= VIT_LIMITS.sysHigh || d >= VIT_LIMITS.diaHigh) ? "high" : "ok"; }
+
+function recordVitals(v, source){
+  const now = Date.now();
+  if (v.pulse != null) VITALS.pulse = v.pulse;
+  if (v.sys != null) VITALS.sys = v.sys;
+  if (v.dia != null) VITALS.dia = v.dia;
+  VITALS.at = now; VITALS.source = source || "manual";
+  VITLOG.push({ at: now, pulse: v.pulse ?? null, sys: v.sys ?? null, dia: v.dia ?? null });
+  if (VITLOG.length > 300) VITLOG = VITLOG.slice(-300);
+  saveVitals();
+  renderHomeVitals(); if (currentView === "vitals") renderVitals();
+  logEvent("vitals", `${v.pulse ?? ""} ${v.sys ?? ""}/${v.dia ?? ""}`);
+  maybeVitalsAlert(v);
+}
+
+function maybeVitalsAlert(v){
+  if (vitAlertPending || Date.now() < vitAlertCooldown) return;
+  const ps = pulseStatus(v.pulse);
+  if (ps !== "high" && ps !== "low") return;
+  vitAlertPending = true; vitAlertCooldown = Date.now() + 10 * 60000;
+  chime(); buzz(HAPTIC.danger);
+  const name = (ACCT && ACCT.name) || "";
+  speak(T("pulseAlertAsk", { p: v.pulse, name }));
+  wantListen = true;
+  setTimeout(()=>{ if (vitAlertPending) startCommand(); }, 3500);
+  vitAlertTimer = setTimeout(()=>{
+    if (!vitAlertPending) return;
+    vitAlertPending = false;
+    logEvent("vitals_autocall", String(v.pulse));
+    openView("sos");
+    if (sos.length) doCall(sos[0]);
+  }, 60000);
+}
+function clearVitalsAlert(){
+  if (!vitAlertPending) return false;
+  vitAlertPending = false;
+  if (vitAlertTimer){ clearTimeout(vitAlertTimer); vitAlertTimer = null; }
+  logEvent("vitals_ok");
+  speak(T("alertOkReply"));
+  return true;
+}
+
+function badge(elm, status){
+  if (!elm) return;
+  if (!status){ elm.hidden = true; return; }
+  elm.hidden = false;
+  elm.className = "chip-badge" + (status === "ok" ? "" : status === "high" ? " bad" : " warn");
+  elm.textContent = status === "ok" ? T("statusNormal") : status === "high" ? T("statusHigh") : T("statusLow");
+}
+
+function renderHomeVitals(){
+  if (!el.homePulse) return;
+  el.homePulse.textContent = VITALS.pulse ?? "—";
+  el.homeBp.textContent = (VITALS.sys && VITALS.dia) ? `${VITALS.sys}/${VITALS.dia}` : "—";
+  const on = !!GLS("nv.brace","");
+  el.braceLine.classList.toggle("off", !on);
+  el.braceLine.textContent = on ? T("braceLineOn", {t: fmtAgo(VITALS.at)}) : T("braceLineOff");
+}
+
+function renderVitals(){
+  badge(el.pulseBadge, pulseStatus(VITALS.pulse));
+  badge(el.bpBadge, bpStatus(VITALS.sys, VITALS.dia));
+  el.vPulse.textContent = VITALS.pulse ?? "—";
+  el.vBp.textContent = (VITALS.sys && VITALS.dia) ? `${VITALS.sys}/${VITALS.dia}` : "—";
+  el.vUpdated.textContent = VITALS.at ? T("updatedAt", {t: fmtAgo(VITALS.at)}) : T("noVitalsYet");
+  const bn = GLS("nv.brace","");
+  el.braceName.textContent = bn || T("braceConnect");
+  el.braceState.textContent = bn ? T("updatedAt", {t: fmtAgo(VITALS.at)}) : T("braceNone");
+  el.braceBadge.hidden = !bn;
+  if (bn){ el.braceBadge.className = "chip-badge"; el.braceBadge.textContent = T("braceConnected"); }
+  /* last-hour pulse bars */
+  el.pulseSpark.innerHTML = "";
+  const pts = VITLOG.filter(e => e.pulse != null).slice(-12);
+  const max = Math.max(100, ...pts.map(e => e.pulse));
+  pts.forEach(e => {
+    const b = document.createElement("span");
+    b.style.height = Math.max(8, Math.round(e.pulse / max * 48)) + "px";
+    if (pulseStatus(e.pulse) !== "ok") b.classList.add("hot");
+    el.pulseSpark.append(b);
+  });
+  /* history list */
+  el.vitalsHist.innerHTML = "";
+  VITLOG.slice(-14).reverse().forEach(e => {
+    const d = document.createElement("div"); d.className = "item";
+    const bits = [];
+    if (e.pulse != null) bits.push(`${T("pulseLabel")} ${e.pulse}`);
+    if (e.sys != null && e.dia != null) bits.push(`${T("bpLabel")} ${e.sys}/${e.dia}`);
+    d.innerHTML = `<div class="main"><div class="t1">${bits.join(" · ")}</div><div class="t2">${new Date(e.at).toLocaleString()}</div></div>`;
+    el.vitalsHist.append(d);
+  });
+}
+
+function saveTypedReading(){
+  const p = parseInt(el.inPulse.value, 10), s = parseInt(el.inSys.value, 10), d = parseInt(el.inDia.value, 10);
+  const v = {};
+  if (!isNaN(p)) v.pulse = p;
+  if (!isNaN(s) && !isNaN(d)){ v.sys = s; v.dia = d; }
+  if (v.pulse == null && v.sys == null) return;
+  recordVitals(v, "manual");
+  el.inPulse.value = el.inSys.value = el.inDia.value = "";
+  speakReadingVerdict(v);
+}
+function speakReadingVerdict(v){
+  if (v.sys != null){
+    const verdict = bpStatus(v.sys, v.dia) === "ok" ? T("verdictNormal") : T("verdictHigh");
+    speak(T("bpSavedSpoken", {s: v.sys, d: v.dia, verdict}));
+  } else if (v.pulse != null){
+    const st = pulseStatus(v.pulse);
+    const verdict = st === "ok" ? T("verdictNormal") : st === "high" ? T("verdictHigh") : T("verdictLow");
+    speak(T("pulseSavedSpoken", {p: v.pulse, verdict}));
+  }
+}
+
+/* Bluetooth bracelet: standard heart-rate service (Android Chrome).
+   iPhones' Safari has no Web Bluetooth — VICA says so and takes
+   readings by voice or keyboard instead. */
+async function connectBracelet(){
+  if (!navigator.bluetooth){ speak(T("braceNotSupported")); return; }
+  try{
+    speak(T("braceSearching"));
+    const dev = await navigator.bluetooth.requestDevice({ filters:[{ services:["heart_rate"] }], optionalServices:["blood_pressure"] });
+    const server = await dev.gatt.connect();
+    const svc = await server.getPrimaryService("heart_rate");
+    const ch = await svc.getCharacteristic("heart_rate_measurement");
+    await ch.startNotifications();
+    ch.addEventListener("characteristicvaluechanged", (e) => {
+      const dv = e.target.value;
+      const flags = dv.getUint8(0);
+      const pulse = (flags & 1) ? dv.getUint16(1, true) : dv.getUint8(1);
+      recordVitals({ pulse }, "bracelet");
+    });
+    braceDevice = dev;
+    GSAVE("nv.brace", dev.name || "bracelet");
+    dev.addEventListener("gattserverdisconnected", ()=>{ GSAVE("nv.brace",""); renderHomeVitals(); if (currentView==="vitals") renderVitals(); });
+    renderHomeVitals(); renderVitals();
+    speak(T("braceDone"));
+    logEvent("bracelet_connected", dev.name || "");
+  }catch(e){ /* person closed the picker — stay quiet */ }
+}
+
+function shareWithDoctor(){
+  const lines = VITLOG.slice(-60).map(e => {
+    const bits = [];
+    if (e.pulse != null) bits.push(`pulse ${e.pulse}`);
+    if (e.sys != null && e.dia != null) bits.push(`BP ${e.sys}/${e.dia}`);
+    return `${new Date(e.at).toLocaleString()}  ${bits.join("  ")}`;
+  });
+  const head = `NAVI-VICA — health readings for ${(ACCT && ACCT.name) || ""}\n\n`;
+  const blob = new Blob([head + lines.join("\n")], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "navi-vica-health.txt"; a.click();
+  speak(T("logSaved"));
+}
+
+el.saveReading.addEventListener("click", saveTypedReading);
+el.braceRow.addEventListener("click", ()=>{ if (!GLS("nv.brace","")) connectBracelet(); else speak(T("braceLineOn", {t: fmtAgo(VITALS.at)})); });
+el.shareDoctor.addEventListener("click", shareWithDoctor);
+
+/* ===================================================================
    HOW TO USE — explained for this person's own profile
    =================================================================== */
 function guideTips(){
@@ -1331,6 +1521,7 @@ const ACTIONS = {
   open_notes:     ()=> openView("notes"),
   open_services:  ()=> openView("services"),
   open_health:    ()=> openView("health"),
+  open_vitals:    ()=> { openView("vitals"); if (VITALS.pulse || VITALS.sys) speak(VITALS.sys ? T("vitalsSpoken",{p:VITALS.pulse ?? "—", s:VITALS.sys, d:VITALS.dia}) : T("pulseOnlySpoken",{p:VITALS.pulse})); },
   open_symptoms:  ()=> openView("symptoms"),
   open_settings:  ()=> openView("settings"),
   open_help:      ()=> openView("help"),
@@ -1367,7 +1558,7 @@ const ACTIONS = {
 
   /* safety */
   sos:            ()=> { openView("sos"); if (sos.length) doCall(sos[0]); else speak(T("sosNone")); },
-  im_okay:        ()=> { if (fallPending) cancelFall(); else if (checkinPending){ checkinPending=false; logEvent("checkin_ok"); speak(R(CHAT("imfine"))); } else speak(R(CHAT("imfine"))); },
+  im_okay:        ()=> { if (fallPending) cancelFall(); else if (clearVitalsAlert()){} else if (checkinPending){ checkinPending=false; logEvent("checkin_ok"); speak(R(CHAT("imfine"))); } else speak(R(CHAT("imfine"))); },
   share_location: ()=> shareLocation(),
   panic_screen:   ()=> setPanic(true),
 
@@ -1389,7 +1580,7 @@ const ACTIONS = {
 const PHRASE_FOR = {
   open_detect:"tileDetect", open_nav:"tileNav", open_alarms:"tileAlarms", open_sos:"tileSos",
   open_chat:"tileChat", open_read:"tileRead", open_find:"tileFind", open_captions:"tileCaptions",
-  open_notes:"tileNotes", open_services:"tileServices", open_health:"tileHealth",
+  open_notes:"tileNotes", open_services:"tileServices", open_health:"tileHealth", open_vitals:"vitalsTitle",
   open_symptoms:"symTitle", open_settings:"tileSettings", open_help:"tileHelp",
   open_guide:"guideBtnLabel", open_all:"allFeaturesLabel", go_home:"barHome"
 };
@@ -1460,9 +1651,10 @@ const INTENTS = [
   ["open_guide",     /(how do i use|how to use|show me how|teach me|как пользоваться|как это работает|научи меня|инструкц)/],
   ["open_all",       /(all features|everything you can|show all|все функции|все возможности)/],
   ["open_account",   /(my account|my profile|my details|мой аккаунт|мой профиль|мои данные)/],
-  ["open_symptoms",  /(symptom|vitals|blood pressure|log how i feel|симптом|показател|давление|как я себя чувствую)/],
+  ["open_symptoms",  /(symptom|log how i feel|симптом|показател|как я себя чувствую)/],
   ["open_notes",     /(my notes|read my notes|note|заметк)/],
   ["open_find",      /(find my things|my things|мои вещи|найти вещи)/],
+  ["open_vitals",    /(my pulse|heart rate|blood pressure|my vitals|мой пульс|пульс|давлени|сердцебиен)/],
   ["open_health",    /(health card|medical card|медицинск|мед.?карт)/],
   ["open_services",  /(services|cab|taxi|food|delivery|такси|еда|доставк)/],
   ["open_settings",  /(settings|preferences|настройк)/],
@@ -1582,6 +1774,12 @@ function handle(raw){
   /* she can open the door herself: spoken or typed account creation/login */
   if (SIGNUP_RX.test(c)){ startVoiceSignup(); return; }
   if (!/(sign out|log out|выйти|выход)/.test(c) && SIGNIN_RX.test(c)){ startVoiceSignin(); return; }
+
+  /* spoken readings come before everything: "my blood pressure is 130 over 85" */
+  const bpm = c.match(/(?:blood pressure|давлени\w*)\D{0,14}?(\d{2,3})\s*(?:over|on|на|\/|,| )\s*(\d{2,3})/);
+  if (bpm){ const v = {sys:+bpm[1], dia:+bpm[2]}; recordVitals(v, "voice"); openView("vitals"); speakReadingVerdict(v); return; }
+  const pm = c.match(/(?:pulse|heart rate|пульс)\D{0,14}?(\d{2,3})\b/);
+  if (pm){ const v = {pulse:+pm[1]}; recordVitals(v, "voice"); openView("vitals"); speakReadingVerdict(v); return; }
 
   /* ---- unified router: typed, spoken and tapped all land here ---- */
   for (const amb of AMBIGUOUS){ if (amb.rx.test(c)){ disambiguate(amb); return; } }
@@ -1921,6 +2119,19 @@ function applyLang(){
   document.documentElement.dir = (S.lang==="ar"||S.lang==="fa") ? "rtl" : "ltr";
   el.langSelect.value = S.lang;
   const set = (id,k)=>{ if (el[id]) el[id].textContent = T(k); };
+  /* the home greeting line: time of day + the person's name */
+  const h = new Date().getHours();
+  const dp = h<12 ? T("daypartMorning") : h<18 ? T("daypartAfternoon") : T("daypartEvening");
+  el.greetText.textContent = T("greetHi",{daypart:dp}) + ((ACCT && ACCT.name) ? `, ${ACCT.name}` : "!");
+  set("barHealthLabel","barHealth"); set("barChatLabel","barChat");
+  set("homePulseLabel","pulseLabel"); set("homeBpLabel","bpLabel"); set("homePulseUnit","bpmWord");
+  set("vitalsTitle","vitalsTitle"); set("pulseSecLabel","pulseSec"); set("bpSecLabel","bpSec");
+  el.vPulseUnit.textContent = T("bpmWord");
+  set("typeReadingTitle","typeReading"); set("saveReadingLabel","saveReading");
+  set("sayReadingHint","sayReadingHint"); set("alertRuleNote","alertRule");
+  set("vHistTitle","vHist"); set("shareDoctorLabel","shareDoctor");
+  el.inPulse.placeholder = T("pulsePh"); el.inSys.placeholder = T("sysPh"); el.inDia.placeholder = T("diaPh");
+  renderHomeVitals(); if (currentView === "vitals") renderVitals();
   set("statusText","statusIdle");
   set("barHomeLabel","barHome"); set("barRepeatLabel","barRepeat");
   set("allFeaturesLabel","allFeaturesLabel"); set("allTitle","allTitle");
@@ -1963,7 +2174,6 @@ function applyLang(){
   set("helpTitle","helpTitle"); set("rehearseLabel","rehearseLabel");
   el.checkinSelect.options[0].textContent=T("checkinOff");
   [4,8,12].forEach((n,i)=> el.checkinSelect.options[i+1].textContent = T("checkinH",{n}));
-  el.greetText.textContent = buildGreeting();
   /* profile dropdown */
   const profs = TO("profiles");
   el.profileSelect.innerHTML="";
@@ -1982,6 +2192,7 @@ function applyLang(){
    ADAPTIVE HOME · AAC · ORIENTATION · SYMPTOMS
    =================================================================== */
 const VIEW_ACTION = {detect:"open_detect", nav:"open_nav", alarms:"open_alarms", sos:"open_sos",
+  vitals:"open_vitals",
   chat:"open_chat", read:"open_read", find:"open_find", captions:"open_captions", notes:"open_notes",
   services:"open_services", health:"open_health", symptoms:"open_symptoms", settings:"open_settings",
   help:"open_help"};
