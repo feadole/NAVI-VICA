@@ -11,9 +11,12 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan surroundings for navigation assistance",
-        "NSMicrophoneUsageDescription": "Voice commands for hands-free control",
-        "NSPhotoLibraryUsageDescription": "Analyze photos for scene description"
+        "NSCameraUsageDescription": "VICA uses the camera to tell you what is around you.",
+        "NSMicrophoneUsageDescription": "VICA listens so you can talk to her hands-free.",
+        "NSPhotoLibraryUsageDescription": "Analyze photos for scene description",
+        "NSLocationWhenInUseUsageDescription": "VICA guides you and shares your location in an emergency.",
+        "NSBluetoothAlwaysUsageDescription": "VICA connects to your pulse bracelet and blood-pressure cuff.",
+        "NSMotionUsageDescription": "VICA notices a fall and checks that you are okay."
       }
     },
     "android": {
@@ -23,13 +26,19 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "CALL_PHONE",
         "CAMERA",
-        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",
+        "RECORD_AUDIO",
+        "SCHEDULE_EXACT_ALARM",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
