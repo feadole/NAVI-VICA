@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -23,8 +24,13 @@ mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'navi_vica_db')]
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    client.close()
+
 # Create the main app
-app = FastAPI(title="NAVI-VICA API", description="Visually-Intelligent Cognitive Assistant API")
+app = FastAPI(title="NAVI-VICA API", description="Visually-Intelligent Cognitive Assistant API", lifespan=lifespan)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -53,7 +59,7 @@ def get_yolo_model():
     return yolo_model
 
 # Gemini AI - lazy loading
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3-flash-preview')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
 
 SYSTEM_PROMPT = """You are NAVI-VICA, a friendly and helpful AI assistant designed to help elderly and disabled individuals navigate their environment safely.
 
@@ -458,6 +464,3 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()

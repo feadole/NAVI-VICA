@@ -157,7 +157,6 @@ function tone(freq, dur, pan){
   try{
     const o = c.createOscillator(), g = c.createGain();
     o.type = "sine"; o.frequency.value = freq;
-    let node = g;
     if (S.spatial && c.createStereoPanner){ const p = c.createStereoPanner(); p.pan.value = pan||0; g.connect(p); p.connect(c.destination); }
     else g.connect(c.destination);
     o.connect(g);
@@ -326,14 +325,20 @@ function startWake(){
       if (mode==="wake" && wantListen && !speaking && !captionsOn){
         /* a session that dies instantly means the mic is being fought over —
            back off instead of spinning the battery (this was the lag) */
-        wakeRetryDelay = (Date.now() - wakeStarted < 1500) ? Math.min(wakeRetryDelay * 2, 4000) : 350;
+        if (Date.now() - wakeStarted < 1500) {
+          wakeRetryDelay = Math.min(wakeRetryDelay * 2, 4000);
+          wakeRetryCount++;
+          if (wakeRetryCount >= 10) { wantListen = false; el.liveLine.textContent = T("micBlocked"); return; }
+        } else {
+          wakeRetryDelay = 350; wakeRetryCount = 0;
+        }
         setTimeout(startWake, wakeRetryDelay);
       }
     };
     rec.start();
   }catch(e){ setTimeout(()=>{ if (wantListen && !speaking) startWake(); }, 1200); }
 }
-let wakeRetryDelay = 350, wakeStarted = 0;
+let wakeRetryDelay = 350, wakeStarted = 0, wakeRetryCount = 0;
 function startCommand(quiet){
   if (!SR) return;
   killRec(); mode = "cmd"; setMic("listen");
@@ -524,7 +529,7 @@ function boxColour(d,W,H){
   }catch(e){ return null; }
 }
 /* traffic-light state by sampling the brightest third of its box */
-function trafficState(d,W,H){
+function trafficState(d){
   try{
     const c=document.createElement("canvas"); c.width=12; c.height=30;
     c.getContext("2d").drawImage(el.video, d.bbox[0], d.bbox[1], d.bbox[2], d.bbox[3], 0,0,12,30);
@@ -628,7 +633,6 @@ let darkAsked = false;
 /* intake log (hydration / meals) */
 function noteIntake(kind){
   const today = new Date().toDateString();
-  const last = LS("nv.intake.last","");
   const key = kind + ":" + today;
   if (LS("nv.seen."+key,"") ) return;
   const now = Date.now();
@@ -2029,7 +2033,10 @@ el.checkinSelect.addEventListener("change", ()=>{ S.checkin=parseInt(el.checkinS
 /* caregiver setup code */
 el.cfgExport.addEventListener("click", async ()=>{
   const cfg = {S, sos, alarms, appts, MC};
-  const code = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+  const _json = JSON.stringify(cfg);
+  const _bytes = new TextEncoder().encode(_json);
+  let _bin = ''; for (const b of _bytes) _bin += String.fromCharCode(b);
+  const code = btoa(_bin);
   try{ await navigator.clipboard.writeText(code); }catch(e){ prompt("Setup code:", code); }
   speak(T("cfgCopied"));
 });
@@ -2037,7 +2044,7 @@ el.cfgImport.addEventListener("click", ()=>{
   const code = prompt(T("cfgImportLabel"));
   if (!code) return;
   try{
-    const cfg = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    const cfg = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(code.trim()), c => c.charCodeAt(0))));
     Object.assign(S, cfg.S||{});
     sos = cfg.sos||sos; alarms = cfg.alarms||alarms; appts = cfg.appts||appts; MC = cfg.MC||MC;
     save("nv.sos",JSON.stringify(sos)); saveAlarms(); saveAppts(); save("nv.mc",JSON.stringify(MC));
@@ -2374,7 +2381,7 @@ window.vicaSignOut = function(){
 window.vicaRetailor = function(conds){ tailorFromConditions(conds, true); };
 
 /* saved details become live app data */
-function seedFromAccount(a, isNew){
+function seedFromAccount(a, _isNew){
   const d = a.details || {};
   /* medical card */
   const mc = JSON.parse(LS("nv.mc","{}"));
